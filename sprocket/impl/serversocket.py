@@ -22,7 +22,7 @@ import random
 import select
 import socket
 from typing import Final, List, Optional
-from ..models.websocketframe import *
+from sprocket.models.websocketbase import WebSocketBase
 
 DEFAULT_HTTP_RESPONSE = b"""<HTML><HEAD><meta http-equiv="content-type"
 content="text/html;charset=utf-8">\r\n
@@ -34,7 +34,7 @@ Welcome to the default.\r\n
 __all__: Final[List[str]] = ["ServerSocketImpl"]
 
 
-class ServerSocketImpl(WebsocketFrame):
+class ServerSocketImpl(WebSocketBase):
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
@@ -46,7 +46,7 @@ class ServerSocketImpl(WebsocketFrame):
         BACKLOG: Optional[int] = 5,
         TIMEOUT: Optional[int] = 5,
     ) -> None:
-        super().__init__()
+        super().__init__(TCP_HOST, TCP_PORT, TCP_BUFFER_SIZE, WS_ENDPOINT)
 
         self.TCP_HOST = TCP_HOST
 
@@ -130,16 +130,6 @@ class ServerSocketImpl(WebsocketFrame):
         client_socket, client_addr = self.tcp_socket.accept()
         print("New socket", client_socket.fileno(), "from address:", client_addr)
         self.input_sockets.append(client_socket)
-
-    def _handle_websocket_message(self, client_socket):
-        # Let's assume that we get a full single frame in each recv (may not
-        # be true IRL)
-        data_in_bytes = client_socket.recv(self.TCP_BUFFER_SIZE)
-
-        self.populateFromWebsocketFrameMessage(data_in_bytes)
-
-        print("Received message:", self.get_payload_data().decode("utf-8"))
-        return
 
     def _handle_request(self, client_socket):
         print("Handling request from client socket:", client_socket.fileno())
