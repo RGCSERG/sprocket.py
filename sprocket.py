@@ -203,22 +203,15 @@
 #     start_websocket_server(host, port)
 
 
-# # class CustomRandomGenerator:
-# #     def __init__(self, seed=1234):
-# #         self.seed = seed
+# from class_testing import ServerSocketImpl
 
-# #     def random(self):
-# #         self.seed = (self.seed * 1664525 + 1013904223) & 0xFFFFFFFF
-# #         return (self.seed >> 24) & 0xFF
+# server = ServerSocketImpl()
 
+# if __name__ == "__main__":
+#     server.start()
 
-# # def generate_masking_key(seed):
-# #     random_generator = CustomRandomGenerator(seed)
-# #     masking_key = bytearray(random_generator.random() for _ in range(4))
-# #     return masking_key
+from sprocket import ServerSocketImpl
 
-
-from class_testing import ServerSocketImpl
 
 server = ServerSocketImpl()
 
