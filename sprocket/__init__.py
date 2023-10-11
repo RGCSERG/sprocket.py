@@ -17,10 +17,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 
-import datetime
+from datetime import datetime
 
 from .impl.serversocket import *
 from .sockets.serversocket import *
+from .impl.clientsocket import *
 
 __version__ = "0.0.0"
 __author__ = "RGCSERG"
