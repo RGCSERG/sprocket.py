@@ -4,7 +4,7 @@ import hashlib
 
 # Define the WebSocket server URL (replace with your server's URL)
 websocket_url = "localhost"
-websocket_port = 5000
+websocket_port = 1000
 
 # WebSocket key and GUID
 websocket_key = "your_websocket_key"
