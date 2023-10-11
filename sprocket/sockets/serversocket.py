@@ -77,7 +77,7 @@ class ServerSocket(ABC):
     @abstractmethod
     def _is_valid_ws_handshake_request(
         self, method: any, target: any, http_version: any, headers_map: dict
-    ) -> any | bool:
+    ) -> bool:
         """Checks if an incoming request is a valid WebSocket handshake request"""
 
     @abstractmethod
