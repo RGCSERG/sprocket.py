@@ -16,19 +16,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import base64
-import hashlib
 import random
-import select
 import socket
 from typing import Final, List, Optional
 
-from sprocket.models.websocketbase import WebSocketBase
+from .websocketbase import WebSocketBaseImpl
 
 __all__: Final[List[str]] = ["ClientSocketImpl"]
 
 
-class ClientSocketImpl(WebSocketBase):
+class ClientSocketImpl(WebSocketBaseImpl):
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
