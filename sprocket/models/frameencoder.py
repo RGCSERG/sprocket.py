@@ -47,7 +47,6 @@ class WebSocketFrameEncoder:
                 masked_payload = bytes(
                     payload[i] ^ mask_key[i % 4] for i in range(payload_length)
                 )
-                print(masked_payload)
                 frame.extend(masked_payload)
             else:
                 frame.append(payload_length)
