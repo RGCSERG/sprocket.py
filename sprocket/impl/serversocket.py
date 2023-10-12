@@ -22,7 +22,7 @@ import random
 import select
 import socket
 from typing import Final, List, Optional
-from sprocket.models.websocketbase import WebSocketBase
+from .websocketbase import WebSocketBaseImpl
 
 DEFAULT_HTTP_RESPONSE = b"""<HTML><HEAD><meta http-equiv="content-type"
 content="text/html;charset=utf-8">\r\n
@@ -34,7 +34,7 @@ Welcome to the default.\r\n
 __all__: Final[List[str]] = ["ServerSocketImpl"]
 
 
-class ServerSocketImpl(WebSocketBase):
+class ServerSocketImpl(WebSocketBaseImpl):
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
@@ -146,14 +146,12 @@ class ServerSocketImpl(WebSocketBase):
             if len(message) > 4 and message_segment[-4:] == "\r\n\r\n":
                 break
 
-        print("Received message:")
-        print(message)
+        print(f"Received message: {message}")
 
         (method, target, http_version, headers_map) = self._parse_request(message)
 
-        print("method, target, http_version:", method, target, http_version)
-        print("headers:")
-        print(headers_map)
+        print("method, target, http_version: ", method, target, http_version)
+        print(f"headers: {headers_map}")
 
         # We will know it's a websockets request if the handshake request is
         # present.
