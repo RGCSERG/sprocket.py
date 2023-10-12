@@ -82,7 +82,7 @@ class WebsocketFrame:
                 self._mask_key_start if self._mask else self._mask_key_start - 4
             )
             encoded_payload = data_in_bytes[
-                payload_start : payload_start + self._payload_length
+                payload_start : payload_start + self._payload_length + 4
             ]
 
             if self._mask:
