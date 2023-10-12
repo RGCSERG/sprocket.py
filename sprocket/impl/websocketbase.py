@@ -56,6 +56,8 @@ class WebSocketBaseImpl:
                 # Connection closed, or no data received.
                 break
 
+            print("Handling websocket message")
+
             data_in_bytes = frame_data
             if not self._is_final_frame(data_in_bytes):
                 # This is a fragmented frame
@@ -67,9 +69,9 @@ class WebSocketBaseImpl:
                 self.frame_decoder.populateFromWebsocketFrameMessage(data_in_bytes)
                 message_payload = self.frame_decoder.get_payload_data()
                 final_message += message_payload.decode("utf-8")
-
-        print("Received message:", final_message)
-        data_in_bytes = b""
+        if final_message and data_in_bytes:
+            print("Received message:", final_message)
+            data_in_bytes = b""
 
     def _is_final_frame(self, data_in_bytes):
         # Check the FIN bit in the first byte of the frame.
