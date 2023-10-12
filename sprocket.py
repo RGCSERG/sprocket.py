@@ -1,3 +1,12 @@
+from sprocket import ServerSocketImpl
+
+
+server = ServerSocketImpl()
+
+if __name__ == "__main__":
+    server.start()
+
+
 # import base64
 # import hashlib
 # import select
@@ -209,11 +218,3 @@
 
 # if __name__ == "__main__":
 #     server.start()
-
-from sprocket import ServerSocketImpl
-
-
-server = ServerSocketImpl()
-
-if __name__ == "__main__":
-    server.start()
