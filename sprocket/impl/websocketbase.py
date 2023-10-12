@@ -17,17 +17,21 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 from typing import Final, List, Optional
-from .websocketframe import *
-from .frameencoder import *
+from ..models.websocketframe import *
+from ..models.frameencoder import *
+
+__all__: Final[List[str]] = ["WebSocketBaseImpl"]
 
 
-class WebSocketBase:
+class WebSocketBaseImpl:
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
         TCP_PORT: Optional[int] = 1000,
         TCP_BUFFER_SIZE: Optional[int] = 8192,
         WS_ENDPOINT: Optional[str] = "/websocket",
+        MAX_FRAME_SIZE: Optional[int] = 125,  # add error checking
+        IS_MASKED: Optional[bool] = True,
     ) -> None:
         self.TCP_HOST = TCP_HOST
 
@@ -38,7 +42,9 @@ class WebSocketBase:
         self.TCP_BUFFER_SIZE = TCP_BUFFER_SIZE
         self.WS_ENDPOINT = WS_ENDPOINT
         self.frame_decoder = WebsocketFrame()
-        self.frame_encoder = WebSocketFrameEncoder()
+        self.frame_encoder = WebSocketFrameEncoder(
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=IS_MASKED
+        )
 
     def _handle_websocket_message(self, client_socket):
         data_in_bytes = b""
@@ -54,12 +60,12 @@ class WebSocketBase:
             if not self._is_final_frame(data_in_bytes):
                 # This is a fragmented frame
                 self.frame_decoder.populateFromWebsocketFrameMessage(data_in_bytes)
-                message_payload = self.get_payload_data()
+                message_payload = self.frame_decoder.get_payload_data()
                 final_message += message_payload.decode("utf-8")
             else:
                 # This is a non-fragmented frame
                 self.frame_decoder.populateFromWebsocketFrameMessage(data_in_bytes)
-                message_payload = self.get_payload_data()
+                message_payload = self.frame_decoder.get_payload_data()
                 final_message += message_payload.decode("utf-8")
 
         print("Received message:", final_message)
