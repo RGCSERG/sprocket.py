@@ -23,11 +23,14 @@ __all__: Final[List[str]] = ["WebSocketFrameEncoder"]
 
 
 class WebSocketFrameEncoder:
-    def __init__(self, max_frame_size: Optional[int] = 125):
+    def __init__(
+        self, MAX_FRAME_SIZE: Optional[int] = 125, IS_MASKED: Optional[bool] = True
+    ):
         # Constructor for the WebSocketFrameEncoder class.
         # It initializes the maximum frame size parameter.
-        self.max_frame_size = max_frame_size
+        self.MAX_FRAME_SIZE = MAX_FRAME_SIZE
         self.mask_key_generator = CustomRandomGenerator()
+        self.IS_MASKED = IS_MASKED
 
     def _generate_frame(self, payload, opcode, fin, mask):
         # Private method to generate a single WebSocket frame.
@@ -44,6 +47,7 @@ class WebSocketFrameEncoder:
                 masked_payload = bytes(
                     payload[i] ^ mask_key[i % 4] for i in range(payload_length)
                 )
+                print(masked_payload)
                 frame.extend(masked_payload)
             else:
                 frame.append(payload_length)
@@ -88,15 +92,17 @@ class WebSocketFrameEncoder:
         self.payload_length = len(self.payload)
         frames = []
 
-        if self.payload_length <= self.max_frame_size:
+        if self.payload_length <= self.MAX_FRAME_SIZE:
             # If payload fits within the maximum frame size, create a single frame.
-            frames.append(self._generate_frame(self.payload, 1, 1, 1))
+            frames.append(self._generate_frame(self.payload, 1, 1, self.IS_MASKED))
         else:
             # If payload exceeds the maximum frame size, split it into multiple frames.
-            for i in range(0, self.payload_length, self.max_frame_size):
-                frame_payload = self.payload[i : i + self.max_frame_size]
-                fin = 0 if (i + self.max_frame_size) < self.payload_length else 1
+            for i in range(0, self.payload_length, self.MAX_FRAME_SIZE):
+                frame_payload = self.payload[i : i + self.MAX_FRAME_SIZE]
+                fin = 0 if (i + self.MAX_FRAME_SIZE) < self.payload_length else 1
                 opcode = 0 if i == 0 else 0x00
-                frames.append(self._generate_frame(frame_payload, opcode, fin, 1))
+                frames.append(
+                    self._generate_frame(frame_payload, opcode, fin, self.IS_MASKED)
+                )
 
         return frames
