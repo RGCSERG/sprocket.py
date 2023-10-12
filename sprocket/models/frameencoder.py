@@ -27,6 +27,7 @@ class WebSocketFrameEncoder:
         # Constructor for the WebSocketFrameEncoder class.
         # It initializes the maximum frame size parameter.
         self.max_frame_size = max_frame_size
+        self.mask_key_generator = CustomRandomGenerator()
 
     def _generate_frame(self, payload, opcode, fin, mask):
         # Private method to generate a single WebSocket frame.
@@ -37,8 +38,8 @@ class WebSocketFrameEncoder:
             # For payloads with length <= 125, use a 7-bit payload length representation.
             frame.append((fin << 7) | opcode)
             if mask:
-                frame.append((1 << 7) | payload_length)
-                mask_key = CustomRandomGenerator.generate_masking_key()
+                frame.append((mask << 7) | payload_length)
+                mask_key = self.mask_key_generator.generate_masking_key()
                 frame.extend(mask_key)
                 masked_payload = bytes(
                     payload[i] ^ mask_key[i % 4] for i in range(payload_length)
@@ -52,10 +53,10 @@ class WebSocketFrameEncoder:
         ):  # payload length that is less than or equal to 65535
             # For payloads with length <= 0xFFFF, use a 16-bit payload length representation.
             frame.append((fin << 7) | opcode)
-            frame.append((1 << 7) | 126)
+            frame.append((mask << 7) | 126)
             frame.extend(payload_length.to_bytes(2, byteorder="big"))
             if mask:
-                mask_key = CustomRandomGenerator.generate_masking_key()
+                mask_key = self.mask_key_generator.generate_masking_key()
                 frame.extend(mask_key)
                 masked_payload = bytes(
                     payload[i] ^ mask_key[i % 4] for i in range(payload_length)
@@ -67,10 +68,10 @@ class WebSocketFrameEncoder:
             # payload length is greater than 65535
             # For payloads with length > 0xFFFF, use a 64-bit payload length representation.
             frame.append((fin << 7) | opcode)
-            frame.append((1 << 7) | 127)
+            frame.append((mask << 7) | 127)
             frame.extend(payload_length.to_bytes(8, byteorder="big"))
             if mask:
-                mask_key = CustomRandomGenerator.generate_masking_key()
+                mask_key = self.mask_key_generator.generate_masking_key()
                 frame.extend(mask_key)
                 masked_payload = bytes(
                     payload[i] ^ mask_key[i % 4] for i in range(payload_length)
