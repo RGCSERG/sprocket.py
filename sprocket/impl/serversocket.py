@@ -117,7 +117,6 @@ class ServerSocketImpl(WebSocketBaseImpl):
                     print("Handling main door socket")
                     self._handle_new_connection()
                 elif socket in self.ws_sockets:
-                    print("Handling websocket message")
                     self._handle_websocket_message(socket)
                 else:
                     print("Handling regular socket read")
