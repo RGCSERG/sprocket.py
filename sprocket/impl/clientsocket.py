@@ -90,15 +90,16 @@ class ClientSocketImpl(WebSocketBaseImpl):
 
         if self._perform_websocket_handshake():
             print("WebSocket handshake successful")
+            self.send_websocket_message("NOT WORKING")
 
-            # Implement your WebSocket logic here
-            while True:
-                data = self.client_socket.recv(self.TCP_BUFFER_SIZE)
-                if not data:
-                    break
-                print(f"Received data: {data.decode('utf-8')}")
-        else:
-            print("WebSocket handshake failed")
+        #     # Implement your WebSocket logic here
+        #     while True:
+        #         data = self.client_socket.recv(self.TCP_BUFFER_SIZE)
+        #         if not data:
+        #             break
+        #         print(f"Received data: {data.decode('utf-8')}")
+        # else:
+        #     print("WebSocket handshake failed")
 
         self.client_socket.close()
 
