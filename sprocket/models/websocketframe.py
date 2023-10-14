@@ -98,3 +98,6 @@ class WebsocketFrame:
 
     def get_payload_data(self):
         return self._payload_data
+
+    def get_control_opcode(self):
+        return self._opcode
