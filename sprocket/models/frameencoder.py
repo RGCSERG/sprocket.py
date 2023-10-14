@@ -32,7 +32,12 @@ class WebSocketFrameEncoder:
         self.mask_key_generator = CustomRandomGenerator()
         self.IS_MASKED = IS_MASKED
 
-    def _generate_frame(self, payload, opcode, fin, mask):
+    def _generate_frame(
+        self,
+        payload: Optional[str] = "",
+        opcode: Optional[bytes] = 0x1,
+        fin: Optional[bytes] = 0x1,
+    ):
         # Private method to generate a single WebSocket frame.
         frame = bytearray()
         payload_length = len(payload)
@@ -40,8 +45,8 @@ class WebSocketFrameEncoder:
         if payload_length <= 125:
             # For payloads with length <= 125, use a 7-bit payload length representation.
             frame.append((fin << 7) | opcode)
-            if mask:
-                frame.append((mask << 7) | payload_length)
+            if self.IS_MASKED:
+                frame.append((self.IS_MASKED << 7) | payload_length)
                 mask_key = self.mask_key_generator.generate_masking_key()
                 frame.extend(mask_key)
                 masked_payload = bytes(
@@ -56,9 +61,9 @@ class WebSocketFrameEncoder:
         ):  # payload length that is less than or equal to 65535
             # For payloads with length <= 0xFFFF, use a 16-bit payload length representation.
             frame.append((fin << 7) | opcode)
-            frame.append((mask << 7) | 126)
+            frame.append((self.IS_MASKED << 7) | 126)
             frame.extend(payload_length.to_bytes(2, byteorder="big"))
-            if mask:
+            if self.IS_MASKED:
                 mask_key = self.mask_key_generator.generate_masking_key()
                 frame.extend(mask_key)
                 masked_payload = bytes(
@@ -71,9 +76,9 @@ class WebSocketFrameEncoder:
             # payload length is greater than 65535
             # For payloads with length > 0xFFFF, use a 64-bit payload length representation.
             frame.append((fin << 7) | opcode)
-            frame.append((mask << 7) | 127)
+            frame.append((self.IS_MASKED << 7) | 127)
             frame.extend(payload_length.to_bytes(8, byteorder="big"))
-            if mask:
+            if self.IS_MASKED:
                 mask_key = self.mask_key_generator.generate_masking_key()
                 frame.extend(mask_key)
                 masked_payload = bytes(
@@ -85,7 +90,9 @@ class WebSocketFrameEncoder:
 
         return frame
 
-    def encode_payload_to_frames(self, payload):
+    def encode_payload_to_frames(
+        self, payload: Optional[str] = "", opcode: Optional[bytes] = 0x1
+    ):
         # Public method to encode a payload into a list of WebSocket frames.
         self.payload = payload.encode("utf-8")
         self.payload_length = len(self.payload)
@@ -93,15 +100,15 @@ class WebSocketFrameEncoder:
 
         if self.payload_length <= self.MAX_FRAME_SIZE:
             # If payload fits within the maximum frame size, create a single frame.
-            frames.append(self._generate_frame(self.payload, 1, 1, self.IS_MASKED))
+            frames.append(
+                self._generate_frame(payload=self.payload, opcode=opcode, fin=0x1)
+            )
         else:
             # If payload exceeds the maximum frame size, split it into multiple frames.
             for i in range(0, self.payload_length, self.MAX_FRAME_SIZE):
                 frame_payload = self.payload[i : i + self.MAX_FRAME_SIZE]
                 fin = 0 if (i + self.MAX_FRAME_SIZE) < self.payload_length else 1
                 opcode = 0 if i == 0 else 0x00
-                frames.append(
-                    self._generate_frame(frame_payload, opcode, fin, self.IS_MASKED)
-                )
+                frames.append(self._generate_frame(frame_payload, opcode, fin))
 
         return frames

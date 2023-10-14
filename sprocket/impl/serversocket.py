@@ -21,7 +21,10 @@ import hashlib
 import random
 import select
 import socket
+import threading
 from typing import Final, List, Optional
+
+from loguru import logger
 from .websocketbase import WebSocketBaseImpl
 
 DEFAULT_HTTP_RESPONSE = b"""<HTML><HEAD><meta http-equiv="content-type"
@@ -100,8 +103,12 @@ class ServerSocketImpl(WebSocketBaseImpl):
 
     def start(self):
         self.tcp_socket.listen(self.BACKLOG)
-        print("Listening on port: ", self.TCP_PORT)
+        logger.debug(f"Listening on port: {self.TCP_PORT}")
 
+        listen_thread = threading.Thread(target=self._listen_for_messages)
+        listen_thread.start()
+
+    def _listen_for_messages(self):
         while True:
             # Get the sockets that are ready to read (the first of the
             # three-tuple).
@@ -109,29 +116,28 @@ class ServerSocketImpl(WebSocketBaseImpl):
                 0
             ]
 
-            for socket in readable_sockets:
-                # Make sure it's not already closed
-                if socket.fileno() == -1:
+            for sock in readable_sockets:
+                if sock.fileno() == -1:
                     continue
-                if socket == self.tcp_socket:
-                    print("Handling main door socket")
+                if sock == self.tcp_socket:
+                    logger.debug("Handling main door socket")
                     self._handle_new_connection()
-                elif socket in self.ws_sockets:
-                    self._handle_websocket_message(socket)
+                elif sock in self.ws_sockets:
+                    self._handle_websocket_message(sock)
                 else:
-                    print("Handling regular socket read")
-                    self._handle_request(socket)
+                    logger.debug("Handling regular socket read")
+                    self._handle_request(sock)
 
     def _handle_new_connection(self):
         # When we get a connection on the main socket, we want to accept a new
         # connection and add it to our input socket list. When we loop back around,
         # that socket will be ready to read from.
         client_socket, client_addr = self.tcp_socket.accept()
-        print("New socket", client_socket.fileno(), "from address:", client_addr)
+        logger.debug("New socket", client_socket.fileno(), "from address:", client_addr)
         self.input_sockets.append(client_socket)
 
     def _handle_request(self, client_socket):
-        print("Handling request from client socket:", client_socket.fileno())
+        logger.debug("Handling request from client socket:", client_socket.fileno())
         message = ""
         # Very naive approach: read until we find the last blank line
         while True:
@@ -145,17 +151,19 @@ class ServerSocketImpl(WebSocketBaseImpl):
             if len(message) > 4 and message_segment[-4:] == "\r\n\r\n":
                 break
 
-        print(f"Received message: {message}")
+        logger.debug(f"Received message: {message}")
 
         (method, target, http_version, headers_map) = self._parse_request(message)
 
-        print("method, target, http_version: ", method, target, http_version)
-        print(f"headers: {headers_map}")
+        logger.debug(
+            f"method, target, http_version: {method}, {target}, {http_version}"
+        )
+        logger.debug(f"headers: {headers_map}")
 
         # We will know it's a websockets request if the handshake request is
         # present.
         if target == self.WS_ENDPOINT:
-            print("request to ws endpoint!")
+            logger.success("request to ws endpoint!")
             if self._is_valid_ws_handshake_request(
                 method, target, http_version, headers_map
             ):
@@ -190,7 +198,9 @@ class ServerSocketImpl(WebSocketBaseImpl):
             "\r\n"
         )
 
-        print("\nresponse:\n", response)
+        logged_response = response.strip("\r\n")
+
+        logger.debug(f"response: {logged_response}")
 
         client_socket.send(response.encode("utf-8"))
 
@@ -238,10 +248,13 @@ class ServerSocketImpl(WebSocketBaseImpl):
             headers_map[header_name.lower()] = value
         return (method, target, http_version, headers_map)
 
-    def _close_socket(self, client_socket):
-        print("closing socket")
-        if client_socket in self.ws_sockets:
-            self.ws_sockets.remove(client_socket)
-        self.input_sockets.remove(client_socket)
-        client_socket.close()
-        return
+    def broadcast_message(self, message: Optional[any]):
+        encoded_message = message.encode("utf-8")
+        for client_socket in self.ws_sockets:
+            try:
+                frames = self.frame_encoder.encode_payload_to_frames(encoded_message)
+                for frame in frames:
+                    client_socket.send(frame)
+            except Exception as e:
+                # Handle any errors or disconnections here
+                logger.warning(f"Error broadcasting message to client: {e}")

@@ -16,9 +16,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
+import socket
 from typing import Final, List, Optional
+
+from loguru import logger
 from ..models.websocketframe import *
 from ..models.frameencoder import *
+from ..models.controlframes import *
 
 __all__: Final[List[str]] = ["WebSocketBaseImpl"]
 
@@ -45,8 +49,27 @@ class WebSocketBaseImpl:
         self.frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=IS_MASKED
         )
+        self.control_frame_types = ControlFrame()
 
-    def _handle_websocket_message(self, client_socket):
+    def _check_control_frame(self, opcode: bytes, client_socket: socket):
+        if opcode == self.control_frame_types.close:
+            self._close_socket(client_socket=client_socket)
+        if opcode == self.control_frame_types.ping:
+            self._pong(client_socket=client_socket)
+        if opcode == self.control_frame_types.pong:
+            logger.debug(f"pusle recieved from {client_socket}")
+
+    def _pong(self, client_socket: socket):
+        self.send_websocket_message(
+            client_socket=client_socket, opcode=self.control_frame_types.pong
+        )
+
+    def ping(self, client_socket: socket):
+        self.send_websocket_message(
+            client_socket=client_socket, opcode=self.control_frame_types.ping
+        )
+
+    def _handle_websocket_message(self, client_socket: socket):
         data_in_bytes = b""
         final_message = ""
 
@@ -56,7 +79,7 @@ class WebSocketBaseImpl:
                 # Connection closed, or no data received.
                 break
 
-            print("Handling websocket message")
+            logger.debug("Handling websocket message")
 
             data_in_bytes = frame_data
             if not self._is_final_frame(data_in_bytes):
@@ -67,12 +90,39 @@ class WebSocketBaseImpl:
             else:
                 # This is a non-fragmented frame
                 self.frame_decoder.populateFromWebsocketFrameMessage(data_in_bytes)
+                control_opcode = self.frame_decoder.get_control_opcode()
+                self._check_control_frame(
+                    opcode=control_opcode, client_socket=client_socket
+                )
                 message_payload = self.frame_decoder.get_payload_data()
                 final_message += message_payload.decode("utf-8")
+                break
+
         if final_message and data_in_bytes:
-            print("Received message:", final_message)
+            logger.debug(f"Received message: {final_message}")
             data_in_bytes = b""
 
-    def _is_final_frame(self, data_in_bytes):
+    def _is_final_frame(self, data_in_bytes: bytes):
         # Check the FIN bit in the first byte of the frame.
         return (data_in_bytes[0] & 0b10000000) >> 7 == 1
+
+    def send_websocket_message(
+        self,
+        message: Optional[str] = "",
+        opcode: Optional[bytes] = None,
+        client_socket=socket,
+    ):
+        frames = self.frame_encoder.encode_payload_to_frames(
+            payload=message, opcode=opcode
+        )
+
+        for frame in frames:
+            client_socket.send(frame)
+
+    def _close_socket(self, client_socket: socket):
+        logger.warning("closing socket")
+        if client_socket in self.ws_sockets:
+            self.ws_sockets.remove(client_socket)
+        self.input_sockets.remove(client_socket)
+        client_socket.close()
+        return

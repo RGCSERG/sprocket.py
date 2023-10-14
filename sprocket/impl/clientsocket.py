@@ -18,7 +18,9 @@ SOFTWARE."""
 
 import random
 import socket
+import threading
 from typing import Final, List, Optional
+from loguru import logger
 
 from .websocketbase import WebSocketBaseImpl
 
@@ -83,28 +85,40 @@ class ClientSocketImpl(WebSocketBaseImpl):
         else:
             return False
 
-    def start_websocket_client(self):
+    def start(self):
         self.client_socket.connect((self.TCP_HOST, self.TCP_PORT))
 
-        print(f"Connected to {self.TCP_HOST}:{self.TCP_PORT}")
+        logger.debug(f"Connected to {self.TCP_HOST}:{self.TCP_PORT}")
 
         if self._perform_websocket_handshake():
-            print("WebSocket handshake successful")
-            self.send_websocket_message("NOT WORKING")
+            logger.success("WebSocket handshake successful")
 
-        #     # Implement your WebSocket logic here
-        #     while True:
-        #         data = self.client_socket.recv(self.TCP_BUFFER_SIZE)
-        #         if not data:
-        #             break
-        #         print(f"Received data: {data.decode('utf-8')}")
-        # else:
-        #     print("WebSocket handshake failed")
+            listen_thread = threading.Thread(target=self._listen_for_messages)
+            listen_thread.start()
 
-        self.client_socket.close()
+        else:
+            logger.warning("WebSocket handshake failed")
 
-    def send_websocket_message(self, message):
-        frames = self.frame_encoder.encode_payload_to_frames(message)
+    def _listen_for_messages(self):
+        while True:
+            self._handle_websocket_message(self.client_socket)
+
+    def send_websocket_message(
+        self,
+        message: Optional[str] = "",
+        opcode: Optional[bytes] = 0x1,
+    ):
+        frames = self.frame_encoder.encode_payload_to_frames(
+            payload=message, opcode=opcode
+        )
 
         for frame in frames:
             self.client_socket.send(frame)
+
+    def close(self):
+        if hasattr(self, "client_socket"):
+            self.send_websocket_message(opcode=self.control_frame_types.close)
+
+    def ping(self):
+        if hasattr(self, "client_socket"):
+            self.send_websocket_message(opcode=self.control_frame_types.ping)
