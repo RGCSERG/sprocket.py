@@ -124,5 +124,8 @@ class WebSocketBaseImpl:
         if client_socket in self.ws_sockets:
             self.ws_sockets.remove(client_socket)
         self.input_sockets.remove(client_socket)
+        self.send_websocket_message(
+            client_socket=client_socket, opcode=self.control_frame_types.close
+        )
         client_socket.close()
         return

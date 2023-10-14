@@ -93,14 +93,15 @@ class ClientSocketImpl(WebSocketBaseImpl):
         if self._perform_websocket_handshake():
             logger.success("WebSocket handshake successful")
 
-            listen_thread = threading.Thread(target=self._listen_for_messages)
-            listen_thread.start()
+            self.SOCKET_OPEN = True
+            self.listen_thread = threading.Thread(target=self._listen_for_messages)
+            self.listen_thread.start()
 
         else:
             logger.warning("WebSocket handshake failed")
 
     def _listen_for_messages(self):
-        while True:
+        while self.SOCKET_OPEN:
             self._handle_websocket_message(self.client_socket)
 
     def send_websocket_message(
@@ -122,3 +123,10 @@ class ClientSocketImpl(WebSocketBaseImpl):
     def ping(self):
         if hasattr(self, "client_socket"):
             self.send_websocket_message(opcode=self.control_frame_types.ping)
+
+    def _close_socket(self, client_socket: socket):
+        if self.SOCKET_OPEN:
+            logger.warning("closing socket")
+            self.SOCKET_OPEN = False
+            client_socket.close()
+            return
