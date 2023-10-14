@@ -102,6 +102,8 @@ class WebSocketBaseImpl:
             logger.debug(f"Received message: {final_message}")
             data_in_bytes = b""
 
+        logger.warning("termination")
+
     def _is_final_frame(self, data_in_bytes: bytes):
         # Check the FIN bit in the first byte of the frame.
         return (data_in_bytes[0] & 0b10000000) >> 7 == 1
