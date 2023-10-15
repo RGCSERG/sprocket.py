@@ -23,7 +23,6 @@ import select
 import socket
 import threading
 from typing import Final, List, Optional
-
 from loguru import logger
 from .websocketbase import WebSocketBaseImpl
 
