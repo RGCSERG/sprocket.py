@@ -247,11 +247,10 @@ class ServerSocketImpl(WebSocketBaseImpl):
             headers_map[header_name.lower()] = value
         return (method, target, http_version, headers_map)
 
-    def broadcast_message(self, message: Optional[any]):
-        encoded_message = message.encode("utf-8")
+    def broadcast_message(self, message: Optional[str] = ""):
         for client_socket in self.ws_sockets:
             try:
-                frames = self.frame_encoder.encode_payload_to_frames(encoded_message)
+                frames = self.frame_encoder.encode_payload_to_frames(message)
                 for frame in frames:
                     client_socket.send(frame)
             except Exception as e:

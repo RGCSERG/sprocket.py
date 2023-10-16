@@ -122,6 +122,7 @@ class ClientSocketImpl(WebSocketBaseImpl):
 
     def ping(self):
         if hasattr(self, "client_socket"):
+            logger.debug("Activating Ping")
             self.send_websocket_message(opcode=self.control_frame_types.ping)
 
     def _close_socket(self, client_socket: socket):
