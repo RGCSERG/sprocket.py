@@ -45,6 +45,7 @@ class ClientSocketImpl(WebSocketBaseImpl):
 
         self.TCP_BUFFER_SIZE = TCP_BUFFER_SIZE
         self.WS_ENDPOINT = WS_ENDPOINT
+        self.SOCKET_OPEN = False
 
         if TCP_KEY is not None:
             self.TCP_KEY = TCP_KEY
@@ -56,6 +57,7 @@ class ClientSocketImpl(WebSocketBaseImpl):
 
     def _setup_socket(self) -> None:
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.setblocking(True)
 
     def _generate_random_websocket_key(self) -> str:
         # Characters that can be used in the GUID
@@ -66,7 +68,7 @@ class ClientSocketImpl(WebSocketBaseImpl):
 
         return random_key
 
-    def _perform_websocket_handshake(self):
+    def _perform_websocket_handshake(self) -> bool:
         request = (
             f"GET /websocket HTTP/1.1\r\n"
             f"Host: {self.TCP_HOST}:{self.TCP_PORT}\r\n"
@@ -85,22 +87,25 @@ class ClientSocketImpl(WebSocketBaseImpl):
         else:
             return False
 
-    def start(self):
-        self.client_socket.connect((self.TCP_HOST, self.TCP_PORT))
+    def start(self) -> None:
+        try:
+            self.client_socket.connect((self.TCP_HOST, self.TCP_PORT))
 
-        logger.debug(f"Connected to {self.TCP_HOST}:{self.TCP_PORT}")
+            logger.debug(f"Connected to {self.TCP_HOST}:{self.TCP_PORT}")
 
-        if self._perform_websocket_handshake():
-            logger.success("WebSocket handshake successful")
+            if self._perform_websocket_handshake():
+                logger.success("WebSocket handshake successful")
 
-            self.SOCKET_OPEN = True
-            self.listen_thread = threading.Thread(target=self._listen_for_messages)
-            self.listen_thread.start()
+                self.SOCKET_OPEN = True
+                self.listen_thread = threading.Thread(target=self._listen_for_messages)
+                self.listen_thread.start()
 
-        else:
-            logger.warning("WebSocket handshake failed")
+            else:
+                logger.warning("WebSocket handshake failed")
+        except ConnectionRefusedError:
+            logger.warning("Connection to server actively refused")
 
-    def _listen_for_messages(self):
+    def _listen_for_messages(self) -> None:
         while self.SOCKET_OPEN:
             self._handle_websocket_message(self.client_socket)
 
@@ -108,24 +113,26 @@ class ClientSocketImpl(WebSocketBaseImpl):
         self,
         message: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
-    ):
-        frames = self.frame_encoder.encode_payload_to_frames(
-            payload=message, opcode=opcode
-        )
+    ) -> None:
+        if self.SOCKET_OPEN:
+            logger.debug("Sending Message")
+            frames = self.frame_encoder.encode_payload_to_frames(
+                payload=message, opcode=opcode
+            )
 
-        for frame in frames:
-            self.client_socket.send(frame)
+            for frame in frames:
+                self.client_socket.send(frame)
 
-    def close(self):
-        if hasattr(self, "client_socket"):
+    def close(self) -> None:
+        if self.SOCKET_OPEN:
             self.send_websocket_message(opcode=self.control_frame_types.close)
 
-    def ping(self):
-        if hasattr(self, "client_socket"):
+    def ping(self) -> None:
+        if self.SOCKET_OPEN:
             logger.debug("Activating Ping")
             self.send_websocket_message(opcode=self.control_frame_types.ping)
 
-    def _close_socket(self, client_socket: socket):
+    def _close_socket(self, client_socket: socket) -> None:
         if self.SOCKET_OPEN:
             logger.warning("closing socket")
             self.SOCKET_OPEN = False

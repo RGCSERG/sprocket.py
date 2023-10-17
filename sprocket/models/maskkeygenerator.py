@@ -23,11 +23,11 @@ __all__: Final[List[str]] = ["CustomRandomGenerator"]
 
 
 class CustomRandomGenerator:
-    def random(self):
+    def random(self) -> int:
         self.seed = (self.seed * 1664525 + 1013904223) & 0xFFFFFFFF
         return (self.seed >> 24) & 0xFF
 
-    def generate_masking_key(self, seed=1234):
+    def generate_masking_key(self, seed=1234) -> bytearray:
         self.seed = seed
         masking_key = bytearray(self.random() for _ in range(4))
         return masking_key

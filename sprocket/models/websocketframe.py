@@ -27,7 +27,7 @@ class WebsocketFrame:
     Provides methods for parsing WebSocket frame messages,
     extracting its components, and returning the payload data."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._fin = 0
         self._rsv1 = 0
         self._rsv2 = 0
@@ -38,13 +38,13 @@ class WebsocketFrame:
         self._mask_key = None
         self._payload_data = b""
 
-    def populateFromWebsocketFrameMessage(self, data_in_bytes):
+    def populateFromWebsocketFrameMessage(self, data_in_bytes) -> None:
         self._parse_flags(data_in_bytes)
         self._parse_payload_length(data_in_bytes)
         self._maybe_parse_masking_key(data_in_bytes)
         self._parse_payload(data_in_bytes)
 
-    def _parse_flags(self, data_in_bytes):
+    def _parse_flags(self, data_in_bytes) -> None:
         first_byte = data_in_bytes[0]
         self._fin = (first_byte & 0b10000000) >> 7
         self._rsv1 = (first_byte & 0b01000000) >> 6
@@ -55,7 +55,7 @@ class WebsocketFrame:
         second_byte = data_in_bytes[1]
         self._mask = (second_byte & 0b10000000) >> 7
 
-    def _parse_payload_length(self, data_in_bytes):
+    def _parse_payload_length(self, data_in_bytes) -> None:
         payload_length = data_in_bytes[1] & 0b01111111
         mask_key_start = 2
 
@@ -69,13 +69,13 @@ class WebsocketFrame:
         self._payload_length = payload_length
         self._mask_key_start = mask_key_start
 
-    def _maybe_parse_masking_key(self, data_in_bytes):
+    def _maybe_parse_masking_key(self, data_in_bytes) -> None:
         if self._mask:
             self._mask_key = data_in_bytes[
                 self._mask_key_start : self._mask_key_start + 4
             ]
 
-    def _parse_payload(self, data_in_bytes):
+    def _parse_payload(self, data_in_bytes) -> None:
         payload_data = b""
         if self._payload_length > 0:
             payload_start = (
@@ -96,8 +96,8 @@ class WebsocketFrame:
 
         self._payload_data = payload_data
 
-    def get_payload_data(self):
+    def get_payload_data(self) -> bytes:
         return self._payload_data
 
-    def get_control_opcode(self):
+    def get_control_opcode(self) -> int:
         return self._opcode

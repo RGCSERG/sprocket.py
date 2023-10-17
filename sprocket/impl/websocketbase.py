@@ -16,7 +16,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
+import select
 import socket
+import threading
+import time
 from typing import Final, List, Optional
 
 from loguru import logger
@@ -36,45 +39,52 @@ class WebSocketBaseImpl:
         WS_ENDPOINT: Optional[str] = "/websocket",
         MAX_FRAME_SIZE: Optional[int] = 125,  # add error checking
         IS_MASKED: Optional[bool] = True,
+        TIMEOUT: Optional[int] = 5,
     ) -> None:
         self.TCP_HOST = TCP_HOST
 
         if TCP_PORT is not None and not (1 <= TCP_PORT <= 65535):
             raise ValueError("TCP_PORT must be in the range of 1-65535.")
         self.TCP_PORT = TCP_PORT
+        self.TIMEOUT = TIMEOUT
 
         self.TCP_BUFFER_SIZE = TCP_BUFFER_SIZE
         self.WS_ENDPOINT = WS_ENDPOINT
+        self.lock = threading.Lock()
         self.frame_decoder = WebsocketFrame()
         self.frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=IS_MASKED
         )
         self.control_frame_types = ControlFrame()
 
-    def _check_control_frame(self, opcode: bytes, client_socket: socket):
+    def _check_control_frame(self, opcode: bytes, client_socket: socket) -> None:
         if opcode == self.control_frame_types.close:
             self._close_socket(client_socket=client_socket)
+            return
         if opcode == self.control_frame_types.ping:
+            logger.debug(f"Recived Ping from {client_socket}")
             self._pong(client_socket=client_socket)
+            return
         if opcode == self.control_frame_types.pong:
-            logger.debug(f"pusle recieved from {client_socket}")
+            logger.debug(f"Recived Pong from {client_socket}")
+            return
 
-    def _pong(self, client_socket: socket):
+    def _pong(self, client_socket: socket) -> None:
         self.send_websocket_message(
             client_socket=client_socket, opcode=self.control_frame_types.pong
         )
 
-    def ping(self, client_socket: socket):
+    def ping(self, client_socket: socket) -> None:
         self.send_websocket_message(
             client_socket=client_socket, opcode=self.control_frame_types.ping
         )
 
-    def _handle_websocket_message(self, client_socket: socket):
+    def _handle_websocket_message(self, client_socket: socket) -> None:
         data_in_bytes = b""
         final_message = ""
 
         while True:
-            frame_data = client_socket.recv(self.TCP_BUFFER_SIZE)
+            frame_data = self._read_recv(client_socket=client_socket)
             if not frame_data:
                 # Connection closed, or no data received.
                 break
@@ -102,7 +112,7 @@ class WebSocketBaseImpl:
             logger.debug(f"Received message: {final_message}")
             data_in_bytes = b""
 
-    def _is_final_frame(self, data_in_bytes: bytes):
+    def _is_final_frame(self, data_in_bytes: bytes) -> bool:
         # Check the FIN bit in the first byte of the frame.
         return (data_in_bytes[0] & 0b10000000) >> 7 == 1
 
@@ -111,7 +121,7 @@ class WebSocketBaseImpl:
         message: Optional[str] = "",
         opcode: Optional[bytes] = None,
         client_socket=socket,
-    ):
+    ) -> None:
         frames = self.frame_encoder.encode_payload_to_frames(
             payload=message, opcode=opcode
         )
@@ -119,13 +129,38 @@ class WebSocketBaseImpl:
         for frame in frames:
             client_socket.send(frame)
 
-    def _close_socket(self, client_socket: socket):
-        logger.warning("closing socket")
-        if client_socket in self.ws_sockets:
-            self.ws_sockets.remove(client_socket)
-        self.input_sockets.remove(client_socket)
-        self.send_websocket_message(
-            client_socket=client_socket, opcode=self.control_frame_types.close
-        )
-        client_socket.close()
-        return
+    def _close_socket(self, client_socket: socket) -> None:
+        with self.lock:
+            logger.warning("closing socket")
+            if client_socket in self.ws_sockets:
+                self.ws_sockets.remove(client_socket)
+            self.input_sockets.remove(client_socket)
+            self.send_websocket_message(
+                client_socket=client_socket, opcode=self.control_frame_types.close
+            )
+            client_socket.close()
+            return
+
+    def _read_recv(self, client_socket: socket) -> None:
+        if hasattr(self, "input_sockets"):
+            readable_sockets = select.select(self.input_sockets, [], [], self.TIMEOUT)[
+                0
+            ]
+        else:
+            readable_sockets = select.select([client_socket], [], [], self.TIMEOUT)[0]
+
+        with self.lock and client_socket in readable_sockets:
+            retry_count = 0
+            max_retries = 5
+
+            while retry_count < max_retries:
+                data = client_socket.recv(self.TCP_BUFFER_SIZE)
+                if data:
+                    return data
+                else:
+                    retry_count += 1
+                    delay = 2**retry_count
+                    print(f"No data received, retrying in {delay} seconds...")
+                    time.sleep(delay)
+            logger.warning("Max retries reached. Unable to read data.")
+            return

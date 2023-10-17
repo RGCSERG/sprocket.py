@@ -25,7 +25,7 @@ __all__: Final[List[str]] = ["WebSocketFrameEncoder"]
 class WebSocketFrameEncoder:
     def __init__(
         self, MAX_FRAME_SIZE: Optional[int] = 125, IS_MASKED: Optional[bool] = True
-    ):
+    ) -> None:
         # Constructor for the WebSocketFrameEncoder class.
         # It initializes the maximum frame size parameter.
         self.MAX_FRAME_SIZE = MAX_FRAME_SIZE
@@ -37,7 +37,7 @@ class WebSocketFrameEncoder:
         payload: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
         fin: Optional[bytes] = 0x1,
-    ):
+    ) -> bytearray:
         # Private method to generate a single WebSocket frame.
         frame = bytearray()
         payload_length = len(payload)
@@ -92,7 +92,7 @@ class WebSocketFrameEncoder:
 
     def encode_payload_to_frames(
         self, payload: Optional[str] = "", opcode: Optional[bytes] = 0x1
-    ):
+    ) -> list:
         # Public method to encode a payload into a list of WebSocket frames.
         self.payload = payload.encode("utf-8")
         self.payload_length = len(self.payload)

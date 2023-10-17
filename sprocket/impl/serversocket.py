@@ -22,7 +22,7 @@ import random
 import select
 import socket
 import threading
-from typing import Final, List, Optional
+from typing import Any, Final, List, NoReturn, Optional
 from loguru import logger
 from .websocketbase import WebSocketBaseImpl
 
@@ -73,7 +73,7 @@ class ServerSocketImpl(WebSocketBaseImpl):
 
         self._setup_socket()
 
-    def _setup_socket(self):
+    def _setup_socket(self) -> None:
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.tcp_socket.bind((self.TCP_HOST, self.TCP_PORT))
@@ -100,14 +100,14 @@ class ServerSocketImpl(WebSocketBaseImpl):
 
         return formatted_guid
 
-    def start(self):
+    def start(self) -> None:
         self.tcp_socket.listen(self.BACKLOG)
         logger.debug(f"Listening on port: {self.TCP_PORT}")
 
         listen_thread = threading.Thread(target=self._listen_for_messages)
         listen_thread.start()
 
-    def _listen_for_messages(self):
+    def _listen_for_messages(self) -> NoReturn:
         while True:
             # Get the sockets that are ready to read (the first of the
             # three-tuple).
@@ -121,13 +121,8 @@ class ServerSocketImpl(WebSocketBaseImpl):
                 if sock == self.tcp_socket:
                     logger.debug("Handling main door socket")
                     self._handle_new_connection()
-                elif sock in self.ws_sockets:
-                    self._handle_websocket_message(sock)
-                else:
-                    logger.debug("Handling regular socket read")
-                    self._handle_request(sock)
 
-    def _handle_new_connection(self):
+    def _handle_new_connection(self) -> None:
         # When we get a connection on the main socket, we want to accept a new
         # connection and add it to our input socket list. When we loop back around,
         # that socket will be ready to read from.
@@ -135,12 +130,35 @@ class ServerSocketImpl(WebSocketBaseImpl):
         logger.debug("New socket", client_socket.fileno(), "from address:", client_addr)
         self.input_sockets.append(client_socket)
 
-    def _handle_request(self, client_socket):
+        listen_thread = threading.Thread(
+            target=self._create_new_client_thread, args=[client_socket]
+        )
+        listen_thread.start()
+
+    def _create_new_client_thread(self, client_socket: socket) -> None:
+        critical = False
+        try:
+            while client_socket in self.input_sockets:
+                if client_socket.fileno() == -1:
+                    continue
+                elif client_socket in self.ws_sockets:
+                    self._handle_websocket_message(client_socket)
+                else:
+                    logger.debug("Handling regular socket read")
+                    self._handle_request(client_socket)
+        except ConnectionResetError:
+            critical = True
+        if critical:
+            logger.critical(f"Socket Forcibly closed {client_socket}")
+        else:
+            logger.warning(f"Closed socket: {client_socket}")
+
+    def _handle_request(self, client_socket) -> None:
         logger.debug("Handling request from client socket:", client_socket.fileno())
         message = ""
         # Very naive approach: read until we find the last blank line
         while True:
-            data_in_bytes = client_socket.recv(self.TCP_BUFFER_SIZE)
+            data_in_bytes = self._read_recv(client_socket=client_socket)
             # Connnection on client side has closed.
             if len(data_in_bytes) == 0:
                 self._close_socket(client_socket)
@@ -178,7 +196,7 @@ class ServerSocketImpl(WebSocketBaseImpl):
         client_socket.send(b"HTTP/1.1 200 OK\r\n\r\n" + DEFAULT_HTTP_RESPONSE)
         self._close_socket(client_socket)
 
-    def _handle_ws_handshake_request(self, client_socket, headers_map):
+    def _handle_ws_handshake_request(self, client_socket, headers_map) -> None:
         self.ws_sockets.append(client_socket)
 
         # To handle a WS handshake, we have to generate an accept key from the
@@ -203,7 +221,7 @@ class ServerSocketImpl(WebSocketBaseImpl):
 
         client_socket.send(response.encode("utf-8"))
 
-    def _generate_sec_websocket_accept(self, sec_websocket_key):
+    def _generate_sec_websocket_accept(self, sec_websocket_key) -> bytes:
         # We generate the accept key by concatenating the sec-websocket-key
         # and the GUID, Sha1 hashing it, and base64 encoding it.
         combined = sec_websocket_key + self.WEBSOCKET_GUID
@@ -211,7 +229,9 @@ class ServerSocketImpl(WebSocketBaseImpl):
         encoded = base64.b64encode(hashed_combined_string.digest())
         return encoded
 
-    def _is_valid_ws_handshake_request(self, method, target, http_version, headers_map):
+    def _is_valid_ws_handshake_request(
+        self, method, target, http_version, headers_map
+    ) -> bool:
         # There are a few things to verify to see if it's a valid WS handshake.
         # First, the method must be get.
         is_get = method == "GET"
@@ -231,7 +251,7 @@ class ServerSocketImpl(WebSocketBaseImpl):
         return is_get and http_version_enough and headers_valid
 
     # Parses the first line and headers from the request.
-    def _parse_request(self, request):
+    def _parse_request(self, request) -> tuple[Any, Any, Any, dict]:
         headers_map = {}
         # Assume headers and body are split by '\r\n\r\n' and we always have them.
         # Also assume all headers end with'\r\n'.
@@ -247,7 +267,7 @@ class ServerSocketImpl(WebSocketBaseImpl):
             headers_map[header_name.lower()] = value
         return (method, target, http_version, headers_map)
 
-    def broadcast_message(self, message: Optional[str] = ""):
+    def broadcast_message(self, message: Optional[str] = "") -> None:
         for client_socket in self.ws_sockets:
             try:
                 frames = self.frame_encoder.encode_payload_to_frames(message)
