@@ -20,7 +20,7 @@ import threading
 from typing import Callable, Final, List, Optional
 from loguru import logger
 
-from .clientsocketbase import *
+from clientsocketbase import *
 
 __all__: Final[List[str]] = ["ClientSocketImpl"]
 
@@ -33,7 +33,7 @@ class ClientSocketImpl(ClientSocketBaseImpl):
         TCP_BUFFER_SIZE: Optional[int] = 8192,
         TCP_KEY: Optional[str] = None,
         TIMEOUT: Optional[int] = 5,
-        MAX_FRAME_SIZE: Optional[int] = 125,  # add error checking
+        MAX_FRAME_SIZE: Optional[int] = 125,  # Add error checking
         IS_MASKED: Optional[bool] = True,
     ) -> None:
         super().__init__(
@@ -47,6 +47,10 @@ class ClientSocketImpl(ClientSocketBaseImpl):
         )
 
     def start(self) -> None:
+        """
+        Establish a WebSocket connection with the server.
+        This method performs the WebSocket handshake and starts listening for messages.
+        """
         try:
             self._client_socket.connect((self._TCP_HOST, self._TCP_PORT))
 
@@ -70,6 +74,14 @@ class ClientSocketImpl(ClientSocketBaseImpl):
         event: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
     ) -> None:
+        """
+        Send a WebSocket message to the server.
+
+        Args:
+            message (str, optional): The message to send.
+            event (str, optional): The event name associated with the message.
+            opcode (bytes, optional): The opcode indicating the type of message.
+        """
         if self._socket_open:
             logger.debug("Sending Message")
 
@@ -87,15 +99,28 @@ class ClientSocketImpl(ClientSocketBaseImpl):
                 self._client_socket.send(frame)
 
     def close(self) -> None:
+        """
+        Close the WebSocket connection by sending a close frame to the server.
+        """
         if self._socket_open:
             self.send_websocket_message(opcode=self._control_frame_types.close)
 
     def ping(self) -> None:
+        """
+        Send a Ping frame to the server.
+        """
         if self._socket_open:
             logger.debug("Activating Ping")
             self.send_websocket_message(opcode=self._control_frame_types.ping)
 
     def on(self, event: str, handler: Callable) -> None:
+        """
+        Register an event handler for a specific event.
+
+        Args:
+            event (str): The name of the event to register.
+            handler (Callable): The event handler function.
+        """
         if event not in self._event_handlers:
             self._event_handlers[event] = []
         self._event_handlers[event].append(handler)

@@ -19,15 +19,16 @@ SOFTWARE."""
 import random, select, socket, threading, time
 from typing import Any, Final, List, Optional
 from loguru import logger
-from sprocket.models.controlframes import ControlFrame
-from sprocket.models.frameencoder import WebSocketFrameEncoder
-from sprocket.models.websocketframe import WebsocketFrame
+from ..models.controlframes import *
+from ..models.frameencoder import *
+from ..models.websocketframe import *
+from ..sockets.clientsocket import *
 
 
 __all__: Final[List[str]] = ["ClientSocketBaseImpl"]
 
 
-class ClientSocketBaseImpl:
+class ClientSocketBaseImpl(ClientSocket):
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",

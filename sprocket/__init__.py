@@ -22,6 +22,7 @@ from datetime import datetime
 from .impl.serversocket import *
 from .sockets.serversocket import *
 from .impl.clientsocket import *
+from .sockets.clientsocket import *
 
 __version__ = "0.0.0"
 __author__ = "RGCSERG"

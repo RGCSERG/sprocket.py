@@ -17,7 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 import socket, threading
-from typing import Any, Callable, Final, List, Optional
+from typing import Callable, Final, List, Optional
 from loguru import logger
 from .serversocketbase import *
 
@@ -38,7 +38,7 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         TCP_PORT: Optional[int] = 1000,
         TCP_BUFFER_SIZE: Optional[int] = 8192,
         WS_ENDPOINT: Optional[str] = "/websocket",
-        MAX_FRAME_SIZE: Optional[int] = 125,  # add error checking
+        MAX_FRAME_SIZE: Optional[int] = 125,  # Add error checking
         IS_MASKED: Optional[bool] = True,
         DEFAULT_HTTP_RESPONSE: Optional[bytes] = DEFAULT_HTTP_RESPONSE,
         WEBSOCKET_GUID: Optional[str] = None,
@@ -59,6 +59,11 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         )
 
     def start(self) -> None:
+        """
+        Starts the WebSocket server and listen for incoming connections.
+        This method listens for incoming connections on the specified host and port,
+        and starts a separate thread to handle incoming messages from clients.
+        """
         self._server_socket.listen(self._BACKLOG)
         logger.debug(f"Listening on port: {self._TCP_PORT}")
 
@@ -66,6 +71,13 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         listen_thread.start()
 
     def broadcast_message(self, message: Optional[str] = "") -> None:
+        """
+        Broadcast a message to all connected WebSocket clients.
+        This method sends a message to all WebSocket clients currently connected to the server.
+
+        Args:
+            message (Optional[str]): The message to broadcast to clients.
+        """
         for client_socket in self._ws_sockets:
             try:
                 frames = self._frame_encoder.encode_payload_to_frames(message)
@@ -82,6 +94,16 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         event: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
     ) -> None:
+        """
+        Send a WebSocket message to a specific client.
+        This method sends a WebSocket message to a specific client identified by the provided socket.
+
+        Args:
+            client_socket (socket): The client socket to send the message to.
+            message (Optional[str]): The message to send to the client.
+            event (Optional[str]): An optional event identifier for the message.
+            opcode (Optional[bytes]): The WebSocket frame opcode.
+        """
         logger.debug("Sending Message")
 
         if event != "":
@@ -98,25 +120,64 @@ class ServerSocketImpl(ServerSocketBaseImpl):
             client_socket.send(frame)
 
     def ping(self, client_socket: socket) -> None:
+        """
+        Send a WebSocket Ping frame to a specific client.
+        This method sends a WebSocket Ping frame to a specific client, prompting a Pong response.
+
+        Args:
+            client_socket (socket): The client socket to send the Ping frame to.
+        """
         self.send_websocket_message(
             client_socket=client_socket, opcode=self.control_frame_types.ping
         )
 
     def on(self, event: str, handler: Callable) -> None:
+        """
+        Register an event handler for a specific event.
+        This method allows registering custom event handlers to respond to specific events.
+
+        Args:
+            event (str): The event to listen for.
+            handler (Callable): The function to be executed when the event occurs.
+        """
         if event not in self._event_handlers:
             self._event_handlers[event] = []
         self._event_handlers[event].append(handler)
 
     def join_room(self, client_socket, room_name) -> None:
+        """
+        Add a client to a specific chat room.
+        This method adds a client (identified by their socket) to a specified chat room.
+
+        Args:
+            client_socket (socket): The client socket to be added to the chat room.
+            room_name (str): The name of the chat room to join.
+        """
         if room_name not in self._rooms:
             self._rooms[room_name] = set()
         self._rooms[room_name].add(client_socket)
 
     def leave_room(self, client_socket, room_name) -> None:
+        """
+        Remove a client from a specific chat room.
+        This method removes a client (identified by their socket) from a specified chat room.
+
+        Args:
+            client_socket (socket): The client socket to be removed from the chat room.
+            room_name (str): The name of the chat room to leave.
+        """
         if room_name in self._rooms and client_socket in self._rooms[room_name]:
             self._rooms[room_name].remove(client_socket)
 
     def broadcast_to_room(self, room_name, message) -> None:
+        """
+        Broadcast a message to all clients in a specific chat room.
+        This method sends a message to all clients who are part of a specific chat room.
+
+        Args:
+            room_name (str): The name of the chat room to broadcast the message to.
+            message (str): The message to broadcast to clients in the chat room.
+        """
         if room_name in self._rooms:
             for client_socket in self._rooms[room_name]:
                 self.send_websocket_message(message, client_socket=client_socket)

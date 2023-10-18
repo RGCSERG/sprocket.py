@@ -23,6 +23,8 @@ __all__: Final[List[str]] = ["ControlFrame"]
 
 
 class ControlFrame(BaseModel):
+    """Amount of bytes for each respective control frame in accordance with websocket protocol"""
+
     close: bytes = 0x8
     ping: bytes = 0x9
     pong: bytes = 0xA

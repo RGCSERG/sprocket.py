@@ -22,6 +22,7 @@ from loguru import logger
 from ..models.websocketframe import *
 from ..models.frameencoder import *
 from ..models.controlframes import *
+from ..sockets.serversocket import *
 
 __all__: Final[List[str]] = ["ServerSocketBaseImpl"]
 
@@ -33,7 +34,7 @@ Welcome to the default.\r\n
 </BODY></HTML>\r\n\r\n"""
 
 
-class ServerSocketBaseImpl:
+class ServerSocketBaseImpl(ServerSocket):
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
