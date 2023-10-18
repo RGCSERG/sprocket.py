@@ -67,10 +67,18 @@ class ClientSocketImpl(ClientSocketBaseImpl):
     def send_websocket_message(
         self,
         message: Optional[str] = "",
+        event: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
     ) -> None:
         if self._socket_open:
             logger.debug("Sending Message")
+
+            if event != "":
+                full_message = f"{event}:{message}"
+                frames = self._frame_encoder.encode_payload_to_frames(
+                    payload=full_message, opcode=opcode
+                )
+
             frames = self._frame_encoder.encode_payload_to_frames(
                 payload=message, opcode=opcode
             )
