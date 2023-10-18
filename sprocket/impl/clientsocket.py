@@ -16,125 +16,78 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import random
-import socket
 import threading
-from typing import Final, List, Optional
+from typing import Callable, Final, List, Optional
 from loguru import logger
 
-from .websocketbase import WebSocketBaseImpl
+from .clientsocketbase import *
 
 __all__: Final[List[str]] = ["ClientSocketImpl"]
 
 
-class ClientSocketImpl(WebSocketBaseImpl):
+class ClientSocketImpl(ClientSocketBaseImpl):
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
         TCP_PORT: Optional[int] = 1000,
         TCP_BUFFER_SIZE: Optional[int] = 8192,
-        WS_ENDPOINT: Optional[str] = "/websocket",
         TCP_KEY: Optional[str] = None,
+        TIMEOUT: Optional[int] = 5,
+        MAX_FRAME_SIZE: Optional[int] = 125,  # add error checking
+        IS_MASKED: Optional[bool] = True,
     ) -> None:
-        super().__init__(TCP_HOST, TCP_PORT, TCP_BUFFER_SIZE, WS_ENDPOINT)
-        self.TCP_HOST = TCP_HOST
-
-        if TCP_PORT is not None and not (1 <= TCP_PORT <= 65535):
-            raise ValueError("TCP_PORT must be in the range of 1-65535.")
-        self.TCP_PORT = TCP_PORT
-
-        self.TCP_BUFFER_SIZE = TCP_BUFFER_SIZE
-        self.WS_ENDPOINT = WS_ENDPOINT
-        self.SOCKET_OPEN = False
-
-        if TCP_KEY is not None:
-            self.TCP_KEY = TCP_KEY
-        else:
-            # Generate a random WebSocket key for each instance
-            self.TCP_KEY = self._generate_random_websocket_key()
-
-        self._setup_socket()
-
-    def _setup_socket(self) -> None:
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.setblocking(True)
-
-    def _generate_random_websocket_key(self) -> str:
-        # Characters that can be used in the GUID
-        characters = "0123456789ABCDEF"
-
-        # Generate a random 32-character string
-        random_key = "".join(random.choice(characters) for _ in range(32))
-
-        return random_key
-
-    def _perform_websocket_handshake(self) -> bool:
-        request = (
-            f"GET /websocket HTTP/1.1\r\n"
-            f"Host: {self.TCP_HOST}:{self.TCP_PORT}\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            f"Sec-WebSocket-Key: {self.TCP_KEY}\r\n"
-            f"Sec-WebSocket-Version: 13\r\n"
-            "\r\n"
+        super().__init__(
+            TCP_HOST=TCP_HOST,
+            TCP_PORT=TCP_PORT,
+            TCP_BUFFER_SIZE=TCP_BUFFER_SIZE,
+            TCP_KEY=TCP_KEY,
+            TIMEOUT=TIMEOUT,
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE,
+            IS_MASKED=IS_MASKED,
         )
-
-        self.client_socket.send(request.encode("utf-8"))
-
-        response = self.client_socket.recv(self.TCP_BUFFER_SIZE).decode("utf-8")
-        if "101 Switching Protocols" in response:
-            return True
-        else:
-            return False
 
     def start(self) -> None:
         try:
-            self.client_socket.connect((self.TCP_HOST, self.TCP_PORT))
+            self._client_socket.connect((self._TCP_HOST, self._TCP_PORT))
 
-            logger.debug(f"Connected to {self.TCP_HOST}:{self.TCP_PORT}")
+            logger.debug(f"Connected to {self._TCP_HOST}:{self._TCP_PORT}")
 
             if self._perform_websocket_handshake():
                 logger.success("WebSocket handshake successful")
 
-                self.SOCKET_OPEN = True
-                self.listen_thread = threading.Thread(target=self._listen_for_messages)
-                self.listen_thread.start()
+                self._socket_open = True
+                listen_thread = threading.Thread(target=self._listen_for_messages)
+                listen_thread.start()
 
             else:
                 logger.warning("WebSocket handshake failed")
         except ConnectionRefusedError:
             logger.warning("Connection to server actively refused")
 
-    def _listen_for_messages(self) -> None:
-        while self.SOCKET_OPEN:
-            self._handle_websocket_message(self.client_socket)
-
     def send_websocket_message(
         self,
         message: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
     ) -> None:
-        if self.SOCKET_OPEN:
+        if self._socket_open:
             logger.debug("Sending Message")
-            frames = self.frame_encoder.encode_payload_to_frames(
+            frames = self._frame_encoder.encode_payload_to_frames(
                 payload=message, opcode=opcode
             )
 
             for frame in frames:
-                self.client_socket.send(frame)
+                self._client_socket.send(frame)
 
     def close(self) -> None:
-        if self.SOCKET_OPEN:
-            self.send_websocket_message(opcode=self.control_frame_types.close)
+        if self._socket_open:
+            self.send_websocket_message(opcode=self._control_frame_types.close)
 
     def ping(self) -> None:
-        if self.SOCKET_OPEN:
+        if self._socket_open:
             logger.debug("Activating Ping")
-            self.send_websocket_message(opcode=self.control_frame_types.ping)
+            self.send_websocket_message(opcode=self._control_frame_types.ping)
 
-    def _close_socket(self, client_socket: socket) -> None:
-        if self.SOCKET_OPEN:
-            logger.warning("closing socket")
-            self.SOCKET_OPEN = False
-            client_socket.close()
-            return
+    def on(self, event: str, handler: Callable) -> None:
+        if event not in self._event_handlers:
+            self._event_handlers[event] = []
+        self._event_handlers[event].append(handler)
