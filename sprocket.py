@@ -6,6 +6,9 @@ server = ServerSocketImpl()
 
 if __name__ == "__main__":
     server.start()
+    while True:
+        time.sleep(5)
+        server.broadcast_message("yooooooooooooooo")
 
 
 # import base64
