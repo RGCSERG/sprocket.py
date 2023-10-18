@@ -221,6 +221,8 @@ class ServerSocketImpl(WebSocketBaseImpl):
 
         client_socket.send(response.encode("utf-8"))
 
+        self._trigger("connection", client_socket)
+
     def _generate_sec_websocket_accept(self, sec_websocket_key) -> bytes:
         # We generate the accept key by concatenating the sec-websocket-key
         # and the GUID, Sha1 hashing it, and base64 encoding it.

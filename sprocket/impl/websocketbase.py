@@ -47,7 +47,9 @@ class WebSocketBaseImpl:
             raise ValueError("TCP_PORT must be in the range of 1-65535.")
         self.TCP_PORT = TCP_PORT
         self.TIMEOUT = TIMEOUT
-
+        self.event_handlers = {}
+        self.event_handlers = {}
+        self.rooms = {}
         self.TCP_BUFFER_SIZE = TCP_BUFFER_SIZE
         self.WS_ENDPOINT = WS_ENDPOINT
         self.lock = threading.Lock()
@@ -56,6 +58,20 @@ class WebSocketBaseImpl:
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=IS_MASKED
         )
         self.control_frame_types = ControlFrame()
+
+    def join_room(self, client_socket, room_name):
+        if room_name not in self.rooms:
+            self.rooms[room_name] = set()
+        self.rooms[room_name].add(client_socket)
+
+    def leave_room(self, client_socket, room_name):
+        if room_name in self.rooms and client_socket in self.rooms[room_name]:
+            self.rooms[room_name].remove(client_socket)
+
+    def broadcast_to_room(self, room_name, message):
+        if room_name in self.rooms:
+            for client_socket in self.rooms[room_name]:
+                self.send_websocket_message(message, client_socket=client_socket)
 
     def _check_control_frame(self, opcode: bytes, client_socket: socket) -> None:
         if opcode == self.control_frame_types.close:
@@ -78,6 +94,16 @@ class WebSocketBaseImpl:
         self.send_websocket_message(
             client_socket=client_socket, opcode=self.control_frame_types.ping
         )
+
+    def on(self, event, handler):
+        if event not in self.event_handlers:
+            self.event_handlers[event] = []
+        self.event_handlers[event].append(handler)
+
+    def _trigger(self, event, *args, **kwargs):
+        if event in self.event_handlers:
+            for handler in self.event_handlers[event]:
+                handler(*args, **kwargs)
 
     def _handle_websocket_message(self, client_socket: socket) -> None:
         data_in_bytes = b""
@@ -111,6 +137,7 @@ class WebSocketBaseImpl:
         if final_message and data_in_bytes:
             logger.debug(f"Received message: {final_message}")
             data_in_bytes = b""
+            self._trigger("message", final_message, client_socket)
 
     def _is_final_frame(self, data_in_bytes: bytes) -> bool:
         # Check the FIN bit in the first byte of the frame.
@@ -149,7 +176,10 @@ class WebSocketBaseImpl:
         else:
             readable_sockets = select.select([client_socket], [], [], self.TIMEOUT)[0]
 
-        with self.lock and client_socket in readable_sockets:
+        if client_socket not in readable_sockets:
+            return
+
+        with self.lock:
             retry_count = 0
             max_retries = 5
 
@@ -162,5 +192,6 @@ class WebSocketBaseImpl:
                     delay = 2**retry_count
                     print(f"No data received, retrying in {delay} seconds...")
                     time.sleep(delay)
+
             logger.warning("Max retries reached. Unable to read data.")
             return
