@@ -78,9 +78,7 @@ class WebsocketFrame:
     def _parse_payload(self, data_in_bytes) -> None:
         payload_data = b""
         if self._payload_length > 0:
-            payload_start = (
-                self._mask_key_start if self._mask else self._mask_key_start - 4
-            )
+            payload_start = self._mask_key_start if self._mask else self._mask_key_start
             encoded_payload = data_in_bytes[
                 payload_start : payload_start + self._payload_length + 4
             ]
