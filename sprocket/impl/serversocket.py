@@ -24,7 +24,7 @@ import socket
 import threading
 from typing import Any, Final, List, NoReturn, Optional
 from loguru import logger
-from .websocketbase import WebSocketBaseImpl
+from .serversocketbase import *
 
 DEFAULT_HTTP_RESPONSE = b"""<HTML><HEAD><meta http-equiv="content-type"
 content="text/html;charset=utf-8">\r\n
@@ -36,7 +36,7 @@ Welcome to the default.\r\n
 __all__: Final[List[str]] = ["ServerSocketImpl"]
 
 
-class ServerSocketImpl(WebSocketBaseImpl):
+class ServerSocketImpl(ServerSocketBaseImpl):
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
@@ -149,6 +149,9 @@ class ServerSocketImpl(WebSocketBaseImpl):
         except ConnectionResetError:
             critical = True
         if critical:
+            if client_socket in self.ws_sockets:
+                self.ws_sockets.remove(client_socket)
+            self.input_sockets.remove(client_socket)
             logger.critical(f"Socket Forcibly closed {client_socket}")
         else:
             logger.warning(f"Closed socket: {client_socket}")
