@@ -16,13 +16,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import base64
-import hashlib
-import random
-import select
-import socket
-import threading
-from typing import Any, Final, List, NoReturn, Optional
+import socket, threading
+from typing import Any, Callable, Final, List, Optional
 from loguru import logger
 from .serversocketbase import *
 
@@ -43,241 +38,85 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         TCP_PORT: Optional[int] = 1000,
         TCP_BUFFER_SIZE: Optional[int] = 8192,
         WS_ENDPOINT: Optional[str] = "/websocket",
+        MAX_FRAME_SIZE: Optional[int] = 125,  # add error checking
+        IS_MASKED: Optional[bool] = True,
         DEFAULT_HTTP_RESPONSE: Optional[bytes] = DEFAULT_HTTP_RESPONSE,
         WEBSOCKET_GUID: Optional[str] = None,
         BACKLOG: Optional[int] = 5,
         TIMEOUT: Optional[int] = 5,
     ) -> None:
-        super().__init__(TCP_HOST, TCP_PORT, TCP_BUFFER_SIZE, WS_ENDPOINT)
-
-        self.TCP_HOST = TCP_HOST
-
-        if TCP_PORT is not None and not (1 <= TCP_PORT <= 65535):
-            raise ValueError("TCP_PORT must be in the range of 1-65535.")
-        self.TCP_PORT = TCP_PORT
-
-        self.TCP_BUFFER_SIZE = TCP_BUFFER_SIZE
-        self.WS_ENDPOINT = WS_ENDPOINT
-
-        if WEBSOCKET_GUID is not None:
-            self.WEBSOCKET_GUID = WEBSOCKET_GUID
-        else:
-            # Generate a random WebSocket GUID for each instance
-            self.WEBSOCKET_GUID = self._generate_random_websocket_guid()
-
-        self.DEFAULT_HTTP_RESPONSE = DEFAULT_HTTP_RESPONSE
-        self.BACKLOG = BACKLOG
-        self.TIMEOUT = TIMEOUT
-        self.input_sockets = []
-        self.ws_sockets = []
-
-        self._setup_socket()
-
-    def _setup_socket(self) -> None:
-        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.tcp_socket.bind((self.TCP_HOST, self.TCP_PORT))
-
-        self.input_sockets.append(self.tcp_socket)
-
-    def _generate_random_websocket_guid(self) -> str:
-        # Characters that can be used in the GUID
-        characters = "0123456789ABCDEF"
-
-        # Generate a random 32-character string
-        random_guid = "".join(random.choice(characters) for _ in range(32))
-
-        # Format it as a WebSocket GUID
-        formatted_guid = "-".join(
-            [
-                random_guid[:8],
-                random_guid[8:12],
-                random_guid[12:16],
-                random_guid[16:20],
-                random_guid[20:],
-            ]
+        super().__init__(
+            TCP_HOST=TCP_HOST,
+            TCP_PORT=TCP_PORT,
+            TCP_BUFFER_SIZE=TCP_BUFFER_SIZE,
+            WS_ENDPOINT=WS_ENDPOINT,
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE,
+            IS_MASKED=IS_MASKED,
+            TIMEOUT=TIMEOUT,
+            DEFAULT_HTTP_RESPONSE=DEFAULT_HTTP_RESPONSE,
+            WEBSOCKET_GUID=WEBSOCKET_GUID,
+            BACKLOG=BACKLOG,
         )
 
-        return formatted_guid
-
     def start(self) -> None:
-        self.tcp_socket.listen(self.BACKLOG)
-        logger.debug(f"Listening on port: {self.TCP_PORT}")
+        self._server_socket.listen(self._BACKLOG)
+        logger.debug(f"Listening on port: {self._TCP_PORT}")
 
         listen_thread = threading.Thread(target=self._listen_for_messages)
         listen_thread.start()
 
-    def _listen_for_messages(self) -> NoReturn:
-        while True:
-            # Get the sockets that are ready to read (the first of the
-            # three-tuple).
-            readable_sockets = select.select(self.input_sockets, [], [], self.TIMEOUT)[
-                0
-            ]
-
-            for sock in readable_sockets:
-                if sock.fileno() == -1:
-                    continue
-                if sock == self.tcp_socket:
-                    logger.debug("Handling main door socket")
-                    self._handle_new_connection()
-
-    def _handle_new_connection(self) -> None:
-        # When we get a connection on the main socket, we want to accept a new
-        # connection and add it to our input socket list. When we loop back around,
-        # that socket will be ready to read from.
-        client_socket, client_addr = self.tcp_socket.accept()
-        logger.debug("New socket", client_socket.fileno(), "from address:", client_addr)
-        self.input_sockets.append(client_socket)
-
-        listen_thread = threading.Thread(
-            target=self._create_new_client_thread, args=[client_socket]
-        )
-        listen_thread.start()
-
-    def _create_new_client_thread(self, client_socket: socket) -> None:
-        critical = False
-        try:
-            while client_socket in self.input_sockets:
-                if client_socket.fileno() == -1:
-                    continue
-                elif client_socket in self.ws_sockets:
-                    self._handle_websocket_message(client_socket)
-                else:
-                    logger.debug("Handling regular socket read")
-                    self._handle_request(client_socket)
-        except ConnectionResetError:
-            critical = True
-        if critical:
-            if client_socket in self.ws_sockets:
-                self.ws_sockets.remove(client_socket)
-            self.input_sockets.remove(client_socket)
-            logger.critical(f"Socket Forcibly closed {client_socket}")
-        else:
-            logger.warning(f"Closed socket: {client_socket}")
-
-    def _handle_request(self, client_socket) -> None:
-        logger.debug("Handling request from client socket:", client_socket.fileno())
-        message = ""
-        # Very naive approach: read until we find the last blank line
-        while True:
-            data_in_bytes = self._read_recv(client_socket=client_socket)
-            # Connnection on client side has closed.
-            if len(data_in_bytes) == 0:
-                self._close_socket(client_socket)
-                return
-            message_segment = data_in_bytes.decode()
-            message += message_segment
-            if len(message) > 4 and message_segment[-4:] == "\r\n\r\n":
-                break
-
-        logger.debug(f"Received message: {message}")
-
-        (method, target, http_version, headers_map) = self._parse_request(message)
-
-        logger.debug(
-            f"method, target, http_version: {method}, {target}, {http_version}"
-        )
-        logger.debug(f"headers: {headers_map}")
-
-        # We will know it's a websockets request if the handshake request is
-        # present.
-        if target == self.WS_ENDPOINT:
-            logger.success("request to ws endpoint!")
-            if self._is_valid_ws_handshake_request(
-                method, target, http_version, headers_map
-            ):
-                self._handle_ws_handshake_request(client_socket, headers_map)
-                return
-            else:
-                # Invalid WS request.
-                client_socket.send(b"HTTP/1.1 400 Bad Request")
-                self._close_socket(client_socket)
-                return
-
-        # For now, just return a 200. Should probably return length too, eh
-        client_socket.send(b"HTTP/1.1 200 OK\r\n\r\n" + DEFAULT_HTTP_RESPONSE)
-        self._close_socket(client_socket)
-
-    def _handle_ws_handshake_request(self, client_socket, headers_map) -> None:
-        self.ws_sockets.append(client_socket)
-
-        # To handle a WS handshake, we have to generate an accept key from the
-        # sec-websocket-key and a magic string.
-        sec_websocket_accept_value = self._generate_sec_websocket_accept(
-            headers_map.get("sec-websocket-key")
-        )
-
-        # We can now build the response, telling the client we're switching
-        # protocols while providing the key.
-        response = (
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            f"Sec-WebSocket-Accept: {sec_websocket_accept_value.decode()}\r\n"
-            "\r\n"
-        )
-
-        logged_response = response.strip("\r\n")
-
-        logger.debug(f"response: {logged_response}")
-
-        client_socket.send(response.encode("utf-8"))
-
-        self._trigger("connection", client_socket)
-
-    def _generate_sec_websocket_accept(self, sec_websocket_key) -> bytes:
-        # We generate the accept key by concatenating the sec-websocket-key
-        # and the GUID, Sha1 hashing it, and base64 encoding it.
-        combined = sec_websocket_key + self.WEBSOCKET_GUID
-        hashed_combined_string = hashlib.sha1(combined.encode())
-        encoded = base64.b64encode(hashed_combined_string.digest())
-        return encoded
-
-    def _is_valid_ws_handshake_request(
-        self, method, target, http_version, headers_map
-    ) -> bool:
-        # There are a few things to verify to see if it's a valid WS handshake.
-        # First, the method must be get.
-        is_get = method == "GET"
-        # HTTP version must be >= 1.1. We can do a really naive check.
-        http_version_number = float(http_version.split("/")[1])
-        http_version_enough = http_version_number >= 1.1
-        # Finally, we should have the right headers. This is a subset of what we'd
-        # really want to check.
-        headers_valid = (
-            ("upgrade" in headers_map and headers_map.get("upgrade") == "websocket")
-            and (
-                "connection" in headers_map
-                and headers_map.get("connection") == "Upgrade"
-            )
-            and ("sec-websocket-key" in headers_map)
-        )
-        return is_get and http_version_enough and headers_valid
-
-    # Parses the first line and headers from the request.
-    def _parse_request(self, request) -> tuple[Any, Any, Any, dict]:
-        headers_map = {}
-        # Assume headers and body are split by '\r\n\r\n' and we always have them.
-        # Also assume all headers end with'\r\n'.
-        # Also assume it starts with the method.
-        split_request = request.split("\r\n\r\n")[0].split("\r\n")
-        [method, target, http_version] = split_request[0].split(" ")
-        headers = split_request[1:]
-        for header_entry in headers:
-            [header_name, value] = header_entry.split(": ")
-            # Headers are case insensitive, so we can just keep track in lowercase.
-            # Here's a trick though: the case of the values matter. Otherwise,
-            # things don't hash and encode right!
-            headers_map[header_name.lower()] = value
-        return (method, target, http_version, headers_map)
-
     def broadcast_message(self, message: Optional[str] = "") -> None:
-        for client_socket in self.ws_sockets:
+        for client_socket in self._ws_sockets:
             try:
-                frames = self.frame_encoder.encode_payload_to_frames(message)
+                frames = self._frame_encoder.encode_payload_to_frames(message)
                 for frame in frames:
                     client_socket.send(frame)
             except Exception as e:
                 # Handle any errors or disconnections here
                 logger.warning(f"Error broadcasting message to client: {e}")
+
+    def send_websocket_message(
+        self,
+        client_socket: socket,
+        message: Optional[str] = "",
+        event: Optional[str] = "",
+        opcode: Optional[bytes] = 0x1,
+    ) -> None:
+        logger.debug("Sending Message")
+
+        if event != "":
+            full_message = f"{event}:{message}"
+            frames = self._frame_encoder.encode_payload_to_frames(
+                payload=full_message, opcode=opcode
+            )
+
+        frames = self._frame_encoder.encode_payload_to_frames(
+            payload=message, opcode=opcode
+        )
+
+        for frame in frames:
+            client_socket.send(frame)
+
+    def ping(self, client_socket: socket) -> None:
+        self.send_websocket_message(
+            client_socket=client_socket, opcode=self.control_frame_types.ping
+        )
+
+    def on(self, event: str, handler: Callable) -> None:
+        if event not in self._event_handlers:
+            self._event_handlers[event] = []
+        self._event_handlers[event].append(handler)
+
+    def join_room(self, client_socket, room_name) -> None:
+        if room_name not in self._rooms:
+            self._rooms[room_name] = set()
+        self._rooms[room_name].add(client_socket)
+
+    def leave_room(self, client_socket, room_name) -> None:
+        if room_name in self._rooms and client_socket in self._rooms[room_name]:
+            self._rooms[room_name].remove(client_socket)
+
+    def broadcast_to_room(self, room_name, message) -> None:
+        if room_name in self._rooms:
+            for client_socket in self._rooms[room_name]:
+                self.send_websocket_message(message, client_socket=client_socket)
