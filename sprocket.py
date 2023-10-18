@@ -5,13 +5,16 @@ from sprocket import ServerSocketImpl
 server = ServerSocketImpl()
 
 
-def deal_with_stuff(message):
-    print(message)
-
-    server.send_websocket_message(message="jit trppings", event="stuff")
+def deal_with_stuff(args, kwargs):
+    server.join_room(args, kwargs)
 
 
-server.on("stuff", deal_with_stuff)
+def send(args, kwargs):
+    server.broadcast_to_room(message=args, client_socket=kwargs)
+
+
+server.on("join_room", deal_with_stuff)
+server.on("send_message", send)
 
 if __name__ == "__main__":
     server.start()

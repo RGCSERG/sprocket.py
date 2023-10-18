@@ -70,7 +70,9 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         listen_thread = threading.Thread(target=self._listen_for_messages)
         listen_thread.start()
 
-    def broadcast_message(self, message: Optional[str] = "") -> None:
+    def broadcast_message(
+        self, message: Optional[str] = "", event: Optional[str] = ""
+    ) -> None:
         """
         Broadcast a message to all connected WebSocket clients.
         This method sends a message to all WebSocket clients currently connected to the server.
@@ -80,7 +82,11 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         """
         for client_socket in self._ws_sockets:
             try:
-                frames = self._frame_encoder.encode_payload_to_frames(message)
+                if event != "":
+                    message = f"{event}:{message}"
+                    frames = self._frame_encoder.encode_payload_to_frames(message)
+                else:
+                    frames = self._frame_encoder.encode_payload_to_frames(message)
                 for frame in frames:
                     client_socket.send(frame)
             except Exception as e:
@@ -144,7 +150,7 @@ class ServerSocketImpl(ServerSocketBaseImpl):
             self._event_handlers[event] = []
         self._event_handlers[event].append(handler)
 
-    def join_room(self, client_socket, room_name) -> None:
+    def join_room(self, room_name, client_socket) -> None:
         """
         Add a client to a specific chat room.
         This method adds a client (identified by their socket) to a specified chat room.
@@ -154,8 +160,8 @@ class ServerSocketImpl(ServerSocketBaseImpl):
             room_name (str): The name of the chat room to join.
         """
         if room_name not in self._rooms:
-            self._rooms[room_name] = set()
-        self._rooms[room_name].add(client_socket)
+            self._rooms[room_name] = []
+        self._rooms[room_name].append(client_socket)
 
     def leave_room(self, client_socket, room_name) -> None:
         """
@@ -169,7 +175,7 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         if room_name in self._rooms and client_socket in self._rooms[room_name]:
             self._rooms[room_name].remove(client_socket)
 
-    def broadcast_to_room(self, room_name, message) -> None:
+    def broadcast_to_room(self, message, client_socket) -> None:
         """
         Broadcast a message to all clients in a specific chat room.
         This method sends a message to all clients who are part of a specific chat room.
@@ -178,6 +184,10 @@ class ServerSocketImpl(ServerSocketBaseImpl):
             room_name (str): The name of the chat room to broadcast the message to.
             message (str): The message to broadcast to clients in the chat room.
         """
-        if room_name in self._rooms:
-            for client_socket in self._rooms[room_name]:
-                self.send_websocket_message(message, client_socket=client_socket)
+        for item in self._rooms:
+            print(self._rooms)
+            if client_socket in self._rooms[item]:
+                for socket in self._rooms[item]:
+                    print(socket)  # FIX TMR
+                    if client_socket != socket:
+                        self.send_websocket_message(message, client_socket=socket)

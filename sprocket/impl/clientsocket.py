@@ -102,6 +102,7 @@ class ClientSocketImpl(ClientSocketBaseImpl):
         """
         Close the WebSocket connection by sending a close frame to the server.
         """
+        logger.warning("Sending Close Frame")
         if self._socket_open:
             self.send_websocket_message(opcode=self._control_frame_types.close)
 

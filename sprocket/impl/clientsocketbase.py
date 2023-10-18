@@ -16,7 +16,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import random, select, socket, threading, time
+import random, select, socket, threading, time, re
 from typing import Any, Final, List, Optional
 from loguru import logger
 from ..models.controlframes import *
@@ -196,8 +196,9 @@ class ClientSocketBaseImpl(ClientSocket):
 
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
         # Trigger event handlers
-        if event in self._event_handlers:
-            for handler in self._event_handlers[event]:
+        text_part = re.sub(r"^.*?(\w+)$", r"\1", event)
+        if text_part in self._event_handlers:
+            for handler in self._event_handlers[text_part]:
                 handler(*args, **kwargs)
 
     def _setup_socket(self) -> None:

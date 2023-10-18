@@ -16,7 +16,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import base64, hashlib, random, select, socket, threading, time
+import base64, hashlib, random, select, socket, threading, time, re
 from typing import Any, Final, List, NoReturn, Optional
 from loguru import logger
 from ..models.websocketframe import *
@@ -132,7 +132,10 @@ class ServerSocketBaseImpl(ServerSocket):
     def _create_new_client_thread(self, client_socket: socket) -> None:
         critical = False
         try:
-            while client_socket in self._input_sockets:
+            readable_sockets = select.select(
+                self._input_sockets, self._ws_sockets, [], self._TIMEOUT
+            )[0]
+            while client_socket in readable_sockets:
                 if client_socket.fileno() == -1:
                     continue
                 elif client_socket in self._ws_sockets:
@@ -286,8 +289,9 @@ class ServerSocketBaseImpl(ServerSocket):
 
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
         # Trigger event handlers
-        if event in self._event_handlers:
-            for handler in self._event_handlers[event]:
+        text_part = re.sub(r"^.*?(\w+)$", r"\1", event)
+        if text_part in self._event_handlers:
+            for handler in self._event_handlers[text_part]:
                 handler(*args, **kwargs)
 
     def _handle_websocket_message(self, client_socket: socket) -> None:
@@ -296,7 +300,7 @@ class ServerSocketBaseImpl(ServerSocket):
 
         while True:
             frame_data = self._read_recv(client_socket=client_socket)
-            if not frame_data:
+            if frame_data == None:
                 # Connection closed, or no data received.
                 break
 
@@ -327,7 +331,7 @@ class ServerSocketBaseImpl(ServerSocket):
         event_separator_index = message.find(":")
         if event_separator_index != -1:
             event_name = message[:event_separator_index]
-            message = message[event_separator_index + 1 : len(message) - 1]
+            message = message[event_separator_index + 1 :]
             logger.debug(f"Received message: {message} , at endpoint {event_name}")
             self._trigger(event_name, message, client_socket)
         else:
@@ -355,11 +359,11 @@ class ServerSocketBaseImpl(ServerSocket):
                 else:
                     retry_count += 1
                     delay = 2**retry_count
-                    print(f"No data received, retrying in {delay} seconds...")
+                    logger.warning(f"No data received, retrying in {delay} seconds...")
                     time.sleep(delay)
 
             logger.warning("Max retries reached. Unable to read data.")
-            return
+            return None
 
     def _close_socket(self, client_socket: socket) -> None:
         with self._LOCK:
