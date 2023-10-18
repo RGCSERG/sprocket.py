@@ -116,9 +116,18 @@ class ClientSocketBaseImpl:
                 break
 
         if final_message and data_in_bytes:
-            logger.debug(f"Received message: {final_message}")
             data_in_bytes = b""
-            self._trigger("message", final_message, client_socket)
+            self._trigger_message_event(final_message, client_socket)
+
+    def _trigger_message_event(self, message: str, client_socket: socket) -> None:
+        event_separator_index = message.find(":")
+        if event_separator_index != -1 or 0:
+            event_name = message[:event_separator_index]
+            message = message[event_separator_index + 1 : len(message) - 1]
+            logger.debug(f"Received message: {message} , at endpoint {event_name}")
+            self._trigger(event_name, message, client_socket)
+        else:
+            logger.debug(f"Received message: {message} , at  no endpoint")
 
     def _is_final_frame(self, data_in_bytes: bytes) -> bool:
         # Check the FIN bit in the first byte of the frame.
