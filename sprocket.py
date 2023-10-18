@@ -4,11 +4,17 @@ from sprocket import ServerSocketImpl
 
 server = ServerSocketImpl()
 
+
+def deal_with_stuff(message):
+    print(message)
+
+    server.send_websocket_message(message="jit trppings", event="stuff")
+
+
+server.on("stuff", deal_with_stuff)
+
 if __name__ == "__main__":
     server.start()
-    while True:
-        time.sleep(5)
-        server.broadcast_message("yooooooooooooooo")
 
 
 # import base64

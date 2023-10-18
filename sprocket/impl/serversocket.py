@@ -111,10 +111,10 @@ class ServerSocketImpl(ServerSocketBaseImpl):
             frames = self._frame_encoder.encode_payload_to_frames(
                 payload=full_message, opcode=opcode
             )
-
-        frames = self._frame_encoder.encode_payload_to_frames(
-            payload=message, opcode=opcode
-        )
+        else:
+            frames = self._frame_encoder.encode_payload_to_frames(
+                payload=message, opcode=opcode
+            )
 
         for frame in frames:
             client_socket.send(frame)

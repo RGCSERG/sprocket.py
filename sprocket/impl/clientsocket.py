@@ -20,7 +20,7 @@ import threading
 from typing import Callable, Final, List, Optional
 from loguru import logger
 
-from clientsocketbase import *
+from .clientsocketbase import *
 
 __all__: Final[List[str]] = ["ClientSocketImpl"]
 
@@ -90,10 +90,10 @@ class ClientSocketImpl(ClientSocketBaseImpl):
                 frames = self._frame_encoder.encode_payload_to_frames(
                     payload=full_message, opcode=opcode
                 )
-
-            frames = self._frame_encoder.encode_payload_to_frames(
-                payload=message, opcode=opcode
-            )
+            else:
+                frames = self._frame_encoder.encode_payload_to_frames(
+                    payload=message, opcode=opcode
+                )
 
             for frame in frames:
                 self._client_socket.send(frame)
