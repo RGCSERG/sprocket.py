@@ -163,7 +163,7 @@ class ServerSocketImpl(ServerSocketBaseImpl):
             self._rooms[room_name] = []
         self._rooms[room_name].append(client_socket)
 
-    def leave_room(self, client_socket: socket, room_name: str) -> None:
+    def leave_room(self, client_socket: socket, room_name: Optional[str] = "") -> None:
         """
         Remove a client from a specific chat room.
         This method removes a client (identified by their socket) from a specified chat room.
@@ -172,8 +172,13 @@ class ServerSocketImpl(ServerSocketBaseImpl):
             client_socket (socket): The client socket to be removed from the chat room.
             room_name (str): The name of the chat room to leave.
         """
-        if room_name in self._rooms and client_socket in self._rooms[room_name]:
-            self._rooms[room_name].remove(client_socket)
+        if room_name != "":
+            if room_name in self._rooms and client_socket in self._rooms[room_name]:
+                self._rooms[room_name].remove(client_socket)
+        else:
+            for room_name in self._rooms:
+                if client_socket in self._rooms[room_name]:
+                    self._rooms[room_name].remove(client_socket)
 
     def broadcast_to_room(
         self,

@@ -149,6 +149,7 @@ class ServerSocketBaseImpl(ServerSocket):
             if client_socket in self._ws_sockets:
                 self._ws_sockets.remove(client_socket)
             self._input_sockets.remove(client_socket)
+            self.leave_room(client_socket=client_socket)
             logger.critical(f"Socket Forcibly closed {client_socket}")
         else:
             logger.warning(f"Closed socket: {client_socket}")
@@ -375,5 +376,6 @@ class ServerSocketBaseImpl(ServerSocket):
             self.send_websocket_message(
                 client_socket=client_socket, opcode=self._control_frame_types.close
             )
+            self.leave_room(client_socket=client_socket)
             client_socket.close()
             return
