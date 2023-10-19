@@ -289,9 +289,8 @@ class ServerSocketBaseImpl(ServerSocket):
 
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
         # Trigger event handlers
-        text_part = re.sub(r"^.*?(\w+)$", r"\1", event)
-        if text_part in self._event_handlers:
-            for handler in self._event_handlers[text_part]:
+        if event in self._event_handlers:
+            for handler in self._event_handlers[event]:
                 handler(*args, **kwargs)
 
     def _handle_websocket_message(self, client_socket: socket) -> None:
@@ -332,6 +331,8 @@ class ServerSocketBaseImpl(ServerSocket):
         if event_separator_index != -1:
             event_name = message[:event_separator_index]
             message = message[event_separator_index + 1 :]
+            event_name = re.sub(r"^.*?(\w+)$", r"\1", event_name)
+            message = re.sub(r"^.*?(\w+)$", r"\1", message)
             logger.debug(f"Received message: {message} , at endpoint {event_name}")
             self._trigger(event_name, message, client_socket)
         else:
