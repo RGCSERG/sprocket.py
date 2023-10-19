@@ -1,4 +1,7 @@
 import time
+from loguru import logger
+
+from pydantic import BaseModel
 from sprocket import ServerSocketImpl
 
 
@@ -9,8 +12,23 @@ def deal_with_stuff(args, kwargs):
     server.join_room(args, kwargs)
 
 
+class Message(BaseModel):
+    owner_id: int
+    message: str
+    room_name: str
+
+
 def send(args, kwargs):
-    server.broadcast_to_room(message=args, client_socket=kwargs)
+    message = Message(**eval(args.replace("'", '"')))
+    logger.warning(str(dict(message)))
+    logger.warning(kwargs)
+
+    server.broadcast_to_room(
+        message=str(dict(message)),
+        client_socket=kwargs,
+        event="recieved_message",
+        room_name=message.room_name,
+    )
 
 
 server.on("join_room", deal_with_stuff)
