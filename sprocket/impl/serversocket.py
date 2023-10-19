@@ -17,7 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 import socket, threading
-from typing import Callable, Final, List, Optional
+from typing import Any, Callable, Final, List, Optional
 from loguru import logger
 from .serversocketbase import *
 
@@ -175,7 +175,13 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         if room_name in self._rooms and client_socket in self._rooms[room_name]:
             self._rooms[room_name].remove(client_socket)
 
-    def broadcast_to_room(self, message: str, client_socket: socket) -> None:
+    def broadcast_to_room(
+        self,
+        room_name: str,
+        message: str,
+        client_socket: Optional[Any] = None,
+        event: Optional[str] = "",
+    ) -> None:
         """
         Broadcast a message to all clients in a specific chat room.
         This method sends a message to all clients who are part of a specific chat room.
@@ -184,10 +190,10 @@ class ServerSocketImpl(ServerSocketBaseImpl):
             client_socket (str): (socket): The client socket which sent the message
             message (str): The message to broadcast to clients in the chat room.
         """
-        for item in self._rooms:
-            if client_socket in self._rooms[item]:
-                for socket in self._rooms[item]:
-                    if client_socket != socket:
-                        self.send_websocket_message(
-                            message=message, client_socket=socket
-                        )
+
+        if self._rooms[room_name] and client_socket in self._rooms[room_name]:
+            for socket in self._rooms[room_name]:
+                if client_socket != socket:
+                    self.send_websocket_message(
+                        message=message, client_socket=socket, event=event
+                    )
