@@ -150,7 +150,7 @@ class ServerSocketImpl(ServerSocketBaseImpl):
             self._event_handlers[event] = []
         self._event_handlers[event].append(handler)
 
-    def join_room(self, room_name, client_socket) -> None:
+    def join_room(self, room_name: str, client_socket: socket) -> None:
         """
         Add a client to a specific chat room.
         This method adds a client (identified by their socket) to a specified chat room.
@@ -163,7 +163,7 @@ class ServerSocketImpl(ServerSocketBaseImpl):
             self._rooms[room_name] = []
         self._rooms[room_name].append(client_socket)
 
-    def leave_room(self, client_socket, room_name) -> None:
+    def leave_room(self, client_socket: socket, room_name: str) -> None:
         """
         Remove a client from a specific chat room.
         This method removes a client (identified by their socket) from a specified chat room.
@@ -175,19 +175,19 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         if room_name in self._rooms and client_socket in self._rooms[room_name]:
             self._rooms[room_name].remove(client_socket)
 
-    def broadcast_to_room(self, message, client_socket) -> None:
+    def broadcast_to_room(self, message: str, client_socket: socket) -> None:
         """
         Broadcast a message to all clients in a specific chat room.
         This method sends a message to all clients who are part of a specific chat room.
 
         Args:
-            room_name (str): The name of the chat room to broadcast the message to.
+            client_socket (str): (socket): The client socket which sent the message
             message (str): The message to broadcast to clients in the chat room.
         """
         for item in self._rooms:
-            print(self._rooms)
             if client_socket in self._rooms[item]:
                 for socket in self._rooms[item]:
-                    print(socket)  # FIX TMR
                     if client_socket != socket:
-                        self.send_websocket_message(message, client_socket=socket)
+                        self.send_websocket_message(
+                            message=message, client_socket=socket
+                        )
