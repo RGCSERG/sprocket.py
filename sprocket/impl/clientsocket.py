@@ -16,6 +16,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
+import random
 import threading
 from typing import Callable, Final, List, Optional
 from loguru import logger
@@ -45,6 +46,8 @@ class ClientSocketImpl(ClientSocketBaseImpl):
             MAX_FRAME_SIZE=MAX_FRAME_SIZE,
             IS_MASKED=IS_MASKED,
         )
+
+        self.ID = random.randint(1000000, 9999999)
 
     def start(self) -> None:
         """
