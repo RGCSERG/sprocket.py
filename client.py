@@ -41,7 +41,7 @@ while True:
         messages.append(message)
         message = {
             "owner_id": client.ID,
-            "message": message,
+            "message": message * 12**4,
             "room_name": "room1",
         }
         client.send_websocket_message(message=str(message), event="send_message")

@@ -1,3 +1,4 @@
+import socket
 import time
 from loguru import logger
 
@@ -20,8 +21,6 @@ class Message(BaseModel):
 
 def send(args, kwargs):
     message = Message(**eval(args.replace("'", '"')))
-    logger.warning(str(dict(message)))
-    logger.warning(kwargs)
 
     server.broadcast_to_room(
         message=str(dict(message)),
@@ -31,13 +30,24 @@ def send(args, kwargs):
     )
 
 
+def main(socket: socket):
+    logger.success(f"socket {socket} connected")
+
+
+server.on("connect", main)
 server.on("join_room", deal_with_stuff)
 server.on("send_message", send)
 
 if __name__ == "__main__":
     server.start()
 
+# class SocketConnected:
+#     def __init__(self, socket:socket) -> None:
+#         self.socket = socket
+#         self.socket.on?
 
+#     def start(self):
+"""Maybe implement this approach?"""
 # import base64
 # import hashlib
 # import select
