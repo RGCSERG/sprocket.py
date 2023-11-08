@@ -23,6 +23,8 @@ from ..models.controlframes import *
 from ..models.frameencoder import *
 from ..models.websocketframe import *
 from ..sockets.clientsocket import *
+from ..functions.checkframesize import *
+from ..functions.checktcpport import *
 
 
 __all__: Final[List[str]] = ["ClientSocketBaseImpl"]
@@ -40,8 +42,11 @@ class ClientSocketBaseImpl(ClientSocket):
         IS_MASKED: Optional[bool] = True,
     ) -> None:
         # Constructor Method
-        if TCP_PORT is not None and not (1 <= TCP_PORT <= 65535):
+        if TCP_PORT is not None and not check_tcp_port(TCP_PORT=TCP_PORT):
             raise ValueError("TCP_PORT must be in the range of 1-65535.")
+        else:
+            # set _TCP_PORT to default value
+            self._TCP_PORT = TCP_PORT
 
         if TCP_KEY is not None:
             self._TCP_KEY = TCP_KEY
@@ -49,8 +54,15 @@ class ClientSocketBaseImpl(ClientSocket):
             # Generate a random WebSocket key for each instance
             self._TCP_KEY = self._generate_random_websocket_key()
 
+        if MAX_FRAME_SIZE is not None and not check_frame_size(
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE
+        ):
+            raise ValueError("MAX_FRAME_SIZE must be greater than 112 bits (14 bytes).")
+        else:
+            # value not set in this class
+            pass
+
         self._TCP_HOST = TCP_HOST
-        self._TCP_PORT = TCP_PORT
         self._TCP_BUFFER_SIZE = TCP_BUFFER_SIZE
         self._TIMEOUT = TIMEOUT
         # ---------------------- #
