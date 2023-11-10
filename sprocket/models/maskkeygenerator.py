@@ -22,7 +22,7 @@ from typing import Final, List
 __all__: Final[List[str]] = ["CustomRandomGenerator"]
 
 
-class CustomRandomGenerator:
+class CustomRandomGenerator:  # give type annotations and comments + make inherit from descriptor class
     def random(self) -> int:
         self.seed = (self.seed * 1664525 + 1013904223) & 0xFFFFFFFF
         return (self.seed >> 24) & 0xFF

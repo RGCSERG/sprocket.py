@@ -25,6 +25,7 @@ __all__: Final[List[str]] = ["ControlFrame"]
 class ControlFrame(BaseModel):
     """Amount of bytes for each respective control frame in accordance with websocket protocol"""
 
+    # Specific control frames defined in https://datatracker.ietf.org/doc/html/rfc6455
     close: bytes = 0x8
     ping: bytes = 0x9
     pong: bytes = 0xA

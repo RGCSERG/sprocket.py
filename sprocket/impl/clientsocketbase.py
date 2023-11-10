@@ -38,7 +38,7 @@ class ClientSocketBaseImpl(ClientSocket):
         TCP_BUFFER_SIZE: Optional[int] = 8192,
         TCP_KEY: Optional[str] = None,
         TIMEOUT: Optional[int] = 5,
-        MAX_FRAME_SIZE: Optional[int] = 125,  # add error checking
+        MAX_FRAME_SIZE: Optional[int] = 125,
         IS_MASKED: Optional[bool] = True,
     ) -> None:
         # Constructor Method

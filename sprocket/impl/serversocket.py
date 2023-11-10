@@ -62,7 +62,7 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         """
         Starts the WebSocket server and listen for incoming connections.
         This method listens for incoming connections on the specified host and port,
-        and starts a separate thread to handle incoming messages from clients.
+        and starts a separate thread to handle incoming messages from each client instance.
         """
         self._server_socket.listen(self._BACKLOG)
         logger.debug(f"Listening on port: {self._TCP_PORT}")
@@ -78,7 +78,7 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         This method sends a message to all WebSocket clients currently connected to the server.
 
         Args:
-            message (Optional[str]): The message to broadcast to clients.
+            message Optional[str]: The message to broadcast to clients.
         """
         for client_socket in self._ws_sockets:
             try:
@@ -105,10 +105,10 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         This method sends a WebSocket message to a specific client identified by the provided socket.
 
         Args:
-            client_socket (socket): The client socket to send the message to.
-            message (Optional[str]): The message to send to the client.
-            event (Optional[str]): An optional event identifier for the message.
-            opcode (Optional[bytes]): The WebSocket frame opcode.
+            client_socket socket: The client socket to send the message to.
+            message Optional[str]: The message to send to the client.
+            event Optional[str]: An optional event identifier for the message.
+            opcode Optional[bytes]: The WebSocket frame opcode.
         """
         logger.debug("Sending Message")
 
@@ -131,7 +131,7 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         This method sends a WebSocket Ping frame to a specific client, prompting a Pong response.
 
         Args:
-            client_socket (socket): The client socket to send the Ping frame to.
+            client_socket socket: The client socket to send the Ping frame to.
         """
         self.send_websocket_message(
             client_socket=client_socket, opcode=self.control_frame_types.ping
@@ -143,8 +143,8 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         This method allows registering custom event handlers to respond to specific events.
 
         Args:
-            event (str): The event to listen for.
-            handler (Callable): The function to be executed when the event occurs.
+            event str: The event to listen for.
+            handler Callable: The function to be executed when the event occurs.
         """
         if event not in self._event_handlers:
             self._event_handlers[event] = []
@@ -156,8 +156,8 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         This method adds a client (identified by their socket) to a specified chat room.
 
         Args:
-            client_socket (socket): The client socket to be added to the chat room.
-            room_name (str): The name of the chat room to join.
+            client_socket socket: The client socket to be added to the chat room.
+            room_name str: The name of the chat room to join.
         """
         if room_name not in self._rooms:
             self._rooms[room_name] = []
@@ -169,8 +169,8 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         This method removes a client (identified by their socket) from a specified chat room.
 
         Args:
-            client_socket (socket): The client socket to be removed from the chat room.
-            room_name (str): The name of the chat room to leave.
+            client_socket socket: The client socket to be removed from the chat room.
+            room_name str: The name of the chat room to leave.
         """
         if room_name != "":
             if room_name in self._rooms and client_socket in self._rooms[room_name]:
@@ -192,8 +192,8 @@ class ServerSocketImpl(ServerSocketBaseImpl):
         This method sends a message to all clients who are part of a specific chat room.
 
         Args:
-            client_socket (str): (socket): The client socket which sent the message
-            message (str): The message to broadcast to clients in the chat room.
+            client_socket socket: The client socket which sent the message
+            message str: The message to broadcast to clients in the chat room.
         """
 
         if self._rooms[room_name] and client_socket in self._rooms[room_name]:

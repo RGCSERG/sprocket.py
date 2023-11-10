@@ -24,4 +24,7 @@ __all__: Final[List[str]] = ["check_tcp_port"]
 
 
 def check_tcp_port(TCP_PORT: int) -> bool:
+    """Checks if TCP_PORT is within localhost range."""
+
+    # TCP_PORT must be between (or equal to) 1 and 65535
     return 1 <= TCP_PORT <= 65535

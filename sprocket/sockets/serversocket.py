@@ -42,25 +42,25 @@ class ServerSocket(ABC):
         Abstract base class for a WebSocket server implementation that handles WebSocket connections and HTTP requests.
 
         Attributes:
-            TCP_HOST (str): The hostname or IP address to which the server socket should bind.
-            TCP_PORT (int): The port number for incoming connections.
-            TCP_BUFFER_SIZE (int): Buffer size for reading data from TCP sockets.
-            WS_ENDPOINT (str): The WebSocket endpoint to handle.
-            MAX_FRAME_SIZE (int): Maximum WebSocket frame size.
-            IS_MASKED (bool): Boolean flag indicating if WebSocket frames should be masked.
-            TIMEOUT (int): Timeout value for socket operations.
-            DEFAULT_HTTP_RESPONSE (bytes): Default HTTP response for regular HTTP requests.
-            WEBSOCKET_GUID (str): Unique identifier for WebSocket connections.
-            BACKLOG (int): Number of unaccepted connections allowed before refusing new connections.
-            _server_socket (socket): Main server socket for incoming connections.
-            _event_handlers (dict): Event handlers for WebSocket events.
-            _rooms (dict): Data structure for managing WebSocket rooms or groups.
-            _input_sockets (list): List of all open socket connections.
-            _ws_sockets (list): List of WebSocket connections currently managed.
-            _frame_decoder (WebsocketFrame): Instance for decoding WebSocket frames.
-            _frame_encoder (WebSocketFrameEncoder): Instance for encoding payloads into WebSocket frames.
-            _control_frame_types (ControlFrame): Instance for WebSocket control frame types.
-            _LOCK (threading.Lock): Threading lock for synchronizing access to shared resources.
+            TCP_HOST str: The hostname or IP address to which the server socket should bind.
+            TCP_PORT int: The port number for incoming connections.
+            TCP_BUFFER_SIZE int: Buffer size for reading data from TCP sockets.
+            WS_ENDPOINT str: The WebSocket endpoint to handle.
+            MAX_FRAME_SIZE int: Maximum WebSocket frame size.
+            IS_MASKED bool: Boolean flag indicating if WebSocket frames should be masked.
+            TIMEOUT int: Timeout value for socket operations.
+            DEFAULT_HTTP_RESPONSE bytes: Default HTTP response for regular HTTP requests.
+            WEBSOCKET_GUID str: Unique identifier for WebSocket connections.
+            BACKLOG int: Number of unaccepted connections allowed before refusing new connections.
+            _server_socket socket: Main server socket for incoming connections.
+            _event_handlers dict: Event handlers for WebSocket events.
+            _rooms dict: Data structure for managing WebSocket rooms or groups.
+            _input_sockets list: List of all open socket connections.
+            _ws_sockets list: List of WebSocket connections currently managed.
+            _frame_decoder WebsocketFrame: Instance for decoding WebSocket frames.
+            _frame_encoder WebSocketFrameEncoder: Instance for encoding payloads into WebSocket frames.
+            _control_frame_types ControlFrame: Instance for WebSocket control frame types.
+            _LOCK threading.Lock: Threading lock for synchronizing access to shared resources.
 
         These attributes collectively form the core of WebSocket server functionality, facilitating socket operations, WebSocket connection management, and frame processing.
         """
@@ -106,7 +106,7 @@ class ServerSocket(ABC):
         This method should create a new thread to handle the communication with a specific client.
 
         Args:
-            client_socket (socket): The client socket to be handled.
+            client_socket socket: The client socket to be handled.
         """
         pass
 
@@ -117,7 +117,7 @@ class ServerSocket(ABC):
         This method should parse and process incoming HTTP requests from clients.
 
         Args:
-            client_socket (socket): The client socket containing the HTTP request.
+            client_socket socket: The client socket containing the HTTP request.
         """
         pass
 
@@ -130,8 +130,8 @@ class ServerSocket(ABC):
         This method should handle WebSocket handshake requests and establish WebSocket connections.
 
         Args:
-            client_socket (socket): The client socket with the WebSocket handshake request.
-            headers_map (dict): The headers from the WebSocket handshake request.
+            client_socket socket: The client socket with the WebSocket handshake request.
+            headers_map dict: The headers from the WebSocket handshake request.
         """
         pass
 
@@ -142,7 +142,7 @@ class ServerSocket(ABC):
         This method should generate and return the value for the 'Sec-WebSocket-Accept' header.
 
         Args:
-            sec_websocket_key (str): The 'Sec-WebSocket-Key' from the client's request.
+            sec_websocket_key str: The 'Sec-WebSocket-Key' from the client's request.
 
         Returns:
             bytes: The 'Sec-WebSocket-Accept' value.
@@ -158,10 +158,10 @@ class ServerSocket(ABC):
         This method should determine if an incoming HTTP request is a valid WebSocket handshake request.
 
         Args:
-            method (str): The HTTP method (e.g., GET).
-            target (str): The request target.
-            http_version (str): The HTTP version (e.g., HTTP/1.1).
-            headers_map (dict): The headers from the request.
+            method str: The HTTP method.
+            target str: The request target.
+            http_version str: The HTTP version.
+            headers_map dict: The headers from the request.
 
         Returns:
             bool: True if the request is a valid WebSocket handshake request, False otherwise.
@@ -175,7 +175,7 @@ class ServerSocket(ABC):
         This method should parse and extract information from an incoming HTTP request.
 
         Args:
-            request (str): The HTTP request as a string.
+            request str: The HTTP request as a string.
 
         Returns:
             Tuple[str, str, str, dict]: A tuple containing the HTTP method, request target,
@@ -190,8 +190,8 @@ class ServerSocket(ABC):
         This method should inspect a WebSocket frame's opcode to identify control frames and handle them accordingly.
 
         Args:
-            opcode (bytes): The opcode of the WebSocket frame.
-            client_socket (socket): The client socket that sent the frame.
+            opcode bytes: The opcode of the WebSocket frame.
+            client_socket socket: The client socket that sent the frame.
         """
         pass
 
@@ -202,7 +202,7 @@ class ServerSocket(ABC):
         This method should send a WebSocket Pong frame to acknowledge a Ping frame from the client.
 
         Args:
-            client_socket (socket): The client socket to send the Pong frame to.
+            client_socket socket: The client socket to send the Pong frame to.
         """
         pass
 
@@ -213,9 +213,9 @@ class ServerSocket(ABC):
         This method should trigger event handlers associated with a particular event.
 
         Args:
-            event (str): The event to trigger.
-            *args (Tuple): Additional arguments to pass to the event handlers.
-            **kwargs (dict): Additional keyword arguments to pass to the event handlers.
+            event str: The event to trigger.
+            args Tuple: Additional arguments to pass to the event handlers.
+            kwargs dict: Additional keyword arguments to pass to the event handlers.
         """
         pass
 
@@ -226,7 +226,7 @@ class ServerSocket(ABC):
         This method should process and handle incoming WebSocket messages received from a client.
 
         Args:
-            client_socket (socket): The client socket with the WebSocket messages.
+            client_socket socket: The client socket with the WebSocket messages.
         """
         pass
 
@@ -238,7 +238,7 @@ class ServerSocket(ABC):
 
         Args:
             message (str): The WebSocket message received.
-            client_socket (socket): The client socket that sent the message.
+            client_socket socket: The client socket that sent the message.
         """
         pass
 
@@ -249,7 +249,7 @@ class ServerSocket(ABC):
         This method should determine whether a WebSocket frame is the final frame of a message.
 
         Args:
-            data_in_bytes (bytes): The WebSocket frame data.
+            data_in_bytes bytes: The WebSocket frame data.
 
         Returns:
             bool: True if it's the final frame, False otherwise.
@@ -263,7 +263,7 @@ class ServerSocket(ABC):
         This method should read data from the client socket, waiting for incoming messages.
 
         Args:
-            client_socket (socket): The client socket to read data from.
+            client_socket socket: The client socket to read data from.
 
         Returns:
             bytes: The data read from the socket.
@@ -277,6 +277,6 @@ class ServerSocket(ABC):
         This method should close a client socket and clean up any associated resources.
 
         Args:
-            client_socket (socket): The client socket to close.
+            client_socket socket: The client socket to close.
         """
         pass

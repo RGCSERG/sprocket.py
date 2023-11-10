@@ -30,7 +30,7 @@ DEFAULT_HTTP_RESPONSE = b"""<HTML><HEAD><meta http-equiv="content-type"
 content="text/html;charset=utf-8">\r\n
 <TITLE>200 OK</TITLE></HEAD><BODY>\r\n
 <H1>200 OK</H1>\r\n
-Welcome to the default.\r\n
+default response\r\n
 </BODY></HTML>\r\n\r\n"""
 
 
@@ -41,7 +41,7 @@ class ServerSocketBaseImpl(ServerSocket):
         TCP_PORT: Optional[int] = 1000,
         TCP_BUFFER_SIZE: Optional[int] = 8192,
         WS_ENDPOINT: Optional[str] = "/websocket",
-        MAX_FRAME_SIZE: Optional[int] = 125,  # add error checking
+        MAX_FRAME_SIZE: Optional[int] = 125,
         IS_MASKED: Optional[bool] = True,
         TIMEOUT: Optional[int] = 5,
         DEFAULT_HTTP_RESPONSE: Optional[bytes] = DEFAULT_HTTP_RESPONSE,
@@ -51,6 +51,7 @@ class ServerSocketBaseImpl(ServerSocket):
         if TCP_PORT is not None and not (1 <= TCP_PORT <= 65535):
             raise ValueError("TCP_PORT must be in the range of 1-65535.")
         if WEBSOCKET_GUID is not None:
+            # set _WEBSOCKET_GUID to value user input
             self._WEBSOCKET_GUID = WEBSOCKET_GUID
         else:
             # Generate a random WebSocket GUID for each instance

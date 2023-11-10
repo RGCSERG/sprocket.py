@@ -34,7 +34,7 @@ class ClientSocketImpl(ClientSocketBaseImpl):
         TCP_BUFFER_SIZE: Optional[int] = 8192,
         TCP_KEY: Optional[str] = None,
         TIMEOUT: Optional[int] = 5,
-        MAX_FRAME_SIZE: Optional[int] = 125,  # Add error checking
+        MAX_FRAME_SIZE: Optional[int] = 125,
         IS_MASKED: Optional[bool] = True,
     ) -> None:
         super().__init__(
@@ -81,9 +81,9 @@ class ClientSocketImpl(ClientSocketBaseImpl):
         Send a WebSocket message to the server.
 
         Args:
-            message (str, optional): The message to send.
-            event (str, optional): The event name associated with the message.
-            opcode (bytes, optional): The opcode indicating the type of message.
+            message Optional[str]: The message to send.
+            event Optional[str]: The event name associated with the message.
+            opcode Optional[bytes]: The opcode indicating the type of message.
         """
         if self._socket_open:
             logger.debug("Sending Message")
@@ -122,8 +122,8 @@ class ClientSocketImpl(ClientSocketBaseImpl):
         Register an event handler for a specific event.
 
         Args:
-            event (str): The name of the event to register.
-            handler (Callable): The event handler function.
+            event str: The name of the event to register.
+            handler Callable: The event handler function.
         """
         if event not in self._event_handlers:
             self._event_handlers[event] = []
