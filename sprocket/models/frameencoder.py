@@ -22,6 +22,9 @@ from .maskkeygenerator import *
 __all__: Final[List[str]] = ["WebSocketFrameEncoder"]
 
 
+"""THIS IS ACTUAL GARBAGE CODE FIX IT FFS LIKE WHAT ARE YOU DOING WITH SELF ATTR"""
+
+
 class WebSocketFrameEncoder:  # make inherit from descriptor class and check type annotations (remove descriptors)
     def __init__(
         self, MAX_FRAME_SIZE: Optional[int] = 125, IS_MASKED: Optional[bool] = True
@@ -34,7 +37,7 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class and check typ
 
     def _generate_frame(
         self,
-        payload: Optional[str] = "",
+        payload: Optional[bytes] = b"",
         opcode: Optional[bytes] = 0x1,
         fin: Optional[bytes] = 0x1,
     ) -> bytearray:
