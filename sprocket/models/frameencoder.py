@@ -74,8 +74,8 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class and check typ
             else:
                 frame.extend(payload)
         else:
-            # payload length is greater than 65535
-            # For payloads with length > 0xFFFF, use a 64-bit payload length representation.
+            # payload length is greater length than 65535
+            # For payloads with  > 0xFFFF, use a 64-bit payload length representation.
             frame.append((fin << 7) | opcode)
             frame.append((self.IS_MASKED << 7) | 127)
             frame.extend(payload_length.to_bytes(8, byteorder="big"))
