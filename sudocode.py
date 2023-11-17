@@ -59,11 +59,11 @@ class WebSocketFrameEncoder(ABC):
     ) -> List[WSFrames]:
         """Encodes a payload into a list of WebSocket frame(s) (WSFrame) using private method generate_frame
 
-        Encode payload into UTF-8 and determine payload length.
+        Encodes payload into UTF-8 and determine payload length.
         Initialize an empty list to store frames.
 
         Args:
-            payload optional string
+            payload str: 
             opcode
 
         Returns:
@@ -77,3 +77,31 @@ class WebSocketFrameEncoder(ABC):
             """If payload exceeds the maximum frame size, split it into multiple frames.
             Iterate over payload chunks and create frames accordingly.
             Append each frame to the list."""
+
+
+
+class FrameEncoder(ABC):
+    def __init__(self) -> None:
+        """nothing to initialise yet"""
+        
+    @abstractmethod
+    def generate_frame(self, payload:bytes) -> WSFrame:
+        """
+        Args:
+            payload bytes
+
+        Returns:
+            WSFrame
+        """
+
+    @abstractmethod
+    def encode_payload_to_frames(payload: str) -> List[WSFrame]:
+        """Takes in data as a string and converts it to websocket frame(s)  (WSFrame)
+        using private method generate_frame
+        
+        Args:
+            payload str
+
+        Returns:
+            list of created WSFrames
+        """
