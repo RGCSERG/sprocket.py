@@ -16,104 +16,206 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-from typing import Final, List, Optional
-from .maskkeygenerator import *
+from typing import Final, List, Optional  # Used for type annotations and decloration.
+from .maskkeygenerator import *  # Import used classes.
 
 __all__: Final[List[str]] = ["WebSocketFrameEncoder"]
 
 
-"""THIS IS ACTUAL GARBAGE CODE FIX IT FFS LIKE WHAT ARE YOU DOING WITH SELF ATTR"""
-
-
 class WebSocketFrameEncoder:  # make inherit from descriptor class and check type annotations (remove descriptors)
     def __init__(
-        self, MAX_FRAME_SIZE: Optional[int] = 125, IS_MASKED: Optional[bool] = True
+        self,
+        MAX_FRAME_SIZE: Optional[
+            int
+        ] = 125,  # Defaults to 125 (maximum control frame size as stated in RFC6455)
+        IS_MASKED: Optional[bool] = True,  # Defaults to True (client).
     ) -> None:
-        # Constructor for the WebSocketFrameEncoder class.
-        # It initializes the maximum frame size parameter.
-        self.MAX_FRAME_SIZE = MAX_FRAME_SIZE
-        self.mask_key_generator = CustomRandomGenerator()
-        self.IS_MASKED = IS_MASKED
+        """
+        Initializes the maximum frame size and masking parameters.
+        Generates random mask key using MaskKeyGenerator class.
+
+        Args:
+            MAX_FRAME_SIZE integer: determines what the maximum frame size created should be.
+            IS_MASKED boolean: determined by whether machine is client or remote host, resulting in true, false respectivly,
+            (in accordance with RFC6455 5.1).
+        """
+        self.MAX_FRAME_SIZE = MAX_FRAME_SIZE  # set MAX_FRAME_SIZE.
+        self.IS_MASKED = IS_MASKED  # set IS_MASKED.
+
+        self.mask_key_generator = (
+            MaskKeyGenerator()
+        )  # Initialise an instance of the MaskKeyGenerator under mask_key_generator (Composition).
 
     def _generate_frame(
         self,
-        payload: Optional[bytes] = b"",
-        opcode: Optional[bytes] = 0x1,
-        fin: Optional[bytes] = 0x1,
+        payload: Optional[
+            bytes
+        ] = b"",  # Defaults to emtpy bytes string (so that empty control frames do not requre a paylaod).
+        opcode: Optional[
+            bytes
+        ] = 0x1,  # Defaults to a text frame (0x1 denotes hexidecimal format of opcode of 0001).
+        fin: Optional[
+            bytes
+        ] = 0x1,  # Defaults to final frame (if a fin bit is not produced then the program will asume it is the final frame).
     ) -> bytearray:
-        """Private method to generate a single WebSocket frame."""
+        """
+        Private method designed generate a single WebSocket frame, converts given bytes data into a valid WebSocket Frame.
 
-        frame = bytearray()
-        payload_length = len(payload)
+        Args:
+            payload bytes: the given payload to be serialised into acceptable WebSocket format
+            opcode bytes: opcode to be inserted into the frame.
+            fin bytes: determines fin bit (whether or not frame created is final), to be inserted into frame.
 
-        if payload_length <= 125:
-            # For payloads with length <= 125, use a 7-bit payload length representation.
-            frame.append((fin << 7) | opcode)
+        """
+
+        frame = bytearray()  # Initialises frame variable as a bytearray.
+        payload_length = len(
+            payload
+        )  # Sets the length of the payload to be serialised.
+
+        if (
+            payload_length <= 0x7D
+        ):  # For standard payloads with length <= 0x7D (125), use a 7-bit payload length representation.
+            frame.append(
+                (fin << 0x7) | opcode
+            )  # Append opcode and fin, with proper bit manipulation. (1)
+            frame.append(
+                (self.IS_MASKED << 0x7) | payload_length
+            )  # Append the masking flag and payload length, with proper bit manipulation. (2)
+
             if self.IS_MASKED:
-                frame.append((self.IS_MASKED << 7) | payload_length)
-                mask_key = self.mask_key_generator.generate_masking_key()
-                frame.extend(mask_key)
+                mask_key = (
+                    self.mask_key_generator.generate_masking_key()
+                )  # If masked (client message), generate a masking key. (3)
+                frame.extend(
+                    mask_key
+                )  # Append masking key to the end of the frame. (4)
                 masked_payload = bytes(
                     payload[i] ^ mask_key[i % 4] for i in range(payload_length)
-                )
-                frame.extend(masked_payload)
+                )  # Perform masking operation on the payload. (5)
+                frame.extend(
+                    masked_payload
+                )  # Append masked payload to the end of the frame. (6)
             else:
-                frame.append(payload_length)
-                frame.extend(payload)
+                frame.extend(
+                    payload
+                )  # Append non masked payload to the end of the frame. (7)
         elif (
             payload_length <= 0xFFFF
-        ):  # payload length that is less than or equal to 65535
+        ):  # payload length that is less than or equal to 0xFFFF (65535).
             # For payloads with length <= 0xFFFF, use a 16-bit payload length representation.
-            frame.append((fin << 7) | opcode)
-            frame.append((self.IS_MASKED << 7) | 126)
-            frame.extend(payload_length.to_bytes(2, byteorder="big"))
+            frame.append(
+                (fin << 0x7) | opcode
+            )  # Append opcode and fin with proper bit manipulation. (1)
+            frame.append(
+                (self.IS_MASKED << 0x7) | 0x7E
+            )  # Append the masking flag and payload length, with proper bit manipulation. (2)
+            frame.extend(
+                payload_length.to_bytes(2, byteorder="big")
+            )  # Append the masking flag and payload length, with proper bit manipulation. (2)
             if self.IS_MASKED:
-                mask_key = self.mask_key_generator.generate_masking_key()
-                frame.extend(mask_key)
+                mask_key = (
+                    self.mask_key_generator.generate_masking_key()
+                )  # If masked (client message), generate a masking key. (3)
+                frame.extend(
+                    mask_key
+                )  # Append masking key to the end of the frame. (4)
                 masked_payload = bytes(
                     payload[i] ^ mask_key[i % 4] for i in range(payload_length)
-                )
-                frame.extend(masked_payload)
+                )  # Perform masking operation on the payload. (5)
+                frame.extend(
+                    masked_payload
+                )  # Append masked payload to the end of the frame. (6)
             else:
-                frame.extend(payload)
+                frame.extend(
+                    payload
+                )  # Append non masked payload to the end of the frame. (7)
         else:
-            # payload length is greater length than 65535
-            # For payloads with  > 0xFFFF, use a 64-bit payload length representation.
-            frame.append((fin << 7) | opcode)
-            frame.append((self.IS_MASKED << 7) | 127)
-            frame.extend(payload_length.to_bytes(8, byteorder="big"))
+            # payload length is greater length than 0xFFFF (65535).
+            # For payloads with  length > 0xFFFF (65535) , use a 64-bit payload length representation.
+            frame.append(
+                (fin << 0x7) | opcode
+            )  # Append opcode and fin with proper bit manipulation. (1)
+            frame.append(
+                (self.IS_MASKED << 0x7) | 0x7F
+            )  # Append the masking flag and payload length, with proper bit manipulation. (2)
+            frame.extend(
+                payload_length.to_bytes(8, byteorder="big")
+            )  # Append the masking flag and payload length, with proper bit manipulation. (2)
             if self.IS_MASKED:
-                mask_key = self.mask_key_generator.generate_masking_key()
-                frame.extend(mask_key)
+                mask_key = (
+                    self.mask_key_generator.generate_masking_key()
+                )  # If masked (client message), generate a masking key. (3)
+                frame.extend(
+                    mask_key
+                )  # Append masking key to the end of the frame. (4)
                 masked_payload = bytes(
                     payload[i] ^ mask_key[i % 4] for i in range(payload_length)
-                )
-                frame.extend(masked_payload)
+                )  # Perform masking operation on the payload. (5)
+                frame.extend(
+                    masked_payload
+                )  # Append masked payload to the end of the frame. (6)
             else:
-                frame.extend(payload)
+                frame.extend(
+                    payload
+                )  # Append non masked payload to the end of the frame. (7)
 
         return frame
+
+    def _is_last_created_frame(self, i: int) -> bytes:
+        """
+        Checks if the frame to be created is the final frame, and returns corresponding value.
+
+        Args:
+            i int: count which is being iterated over
+
+        Returns:
+            0x0 if a continuation frame, and 0x1 if final frame of message,
+            (0x0 denoting continuation frame as stated in RFC6455 5.2).
+        """
+        return 0x0 if (i + self.MAX_FRAME_SIZE) < self.payload_length else 0x1
 
     def encode_payload_to_frames(
         self, payload: Optional[str] = "", opcode: Optional[bytes] = 0x1
     ) -> list:
-        """Encodes a payload into a list of WebSocket frames."""
+        """
+        Encodes a payload into a list of WebSocket frame(s) using private method _generate_frame.
 
-        self.payload = payload.encode("utf-8")
-        self.payload_length = len(self.payload)
-        frames = []
+        Args:
+            payload str: payload to be serialised
+            opcode: allows control frames to be sent,
+            (doesn't conflict with messages longer than max frame size,
+            as control frames are required to fit a singular frame).
+
+        Returns:
+            list of created WebSocket Frame(s)
+        """
+
+        self.payload = payload.encode("utf-8")  # Encode payload into UTF-8.
+        self.payload_length = len(self.payload)  # Determine payload length.
+        frames = []  # Initialises an empty list to store frames created.
 
         if self.payload_length <= self.MAX_FRAME_SIZE:
-            # If payload fits within the maximum frame size, create a single frame.
+            """
+            If payload fits within the maximum frame size, create a single frame.
+            Append the generated frame to the list.
+            """
             frames.append(
                 self._generate_frame(payload=self.payload, opcode=opcode, fin=0x1)
-            )
+            )  # Creates frame and then appends it to the frames list.
         else:
-            # If payload exceeds the maximum frame size, split it into multiple frames.
+            """
+            If payload exceeds the maximum frame size, split it into multiple frames.
+            Iterates over payload chunks and create frames accordingly, then append each frame to the list.
+            """
             for i in range(0, self.payload_length, self.MAX_FRAME_SIZE):
-                frame_payload = self.payload[i : i + self.MAX_FRAME_SIZE]
-                fin = 0 if (i + self.MAX_FRAME_SIZE) < self.payload_length else 1
-                opcode = 0 if i == 0 else 0x00
-                frames.append(self._generate_frame(frame_payload, opcode, fin))
+                frame_payload = self.payload[
+                    i : i + self.MAX_FRAME_SIZE
+                ]  # Selects chunk to be serialised.
+                fin = self._is_last_created_frame(i)  # Asigns fin bit value.
+                opcode = self._is_last_created_frame(i)  # Asigns opcode bit value.
+                frames.append(
+                    self._generate_frame(frame_payload, opcode, fin)
+                )  # Creates frame and then appends it to the frames list.
 
         return frames
