@@ -17,12 +17,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 from typing import Final, List, Optional  # Used for type annotations and decloration.
-from .maskkeygenerator import *  # Import used classes.
+from .maskkey import *  # Import used classes.
+from .frameopcodes import *  # Import used classes.
 
 __all__: Final[List[str]] = ["WebSocketFrameEncoder"]
 
 
-class WebSocketFrameEncoder:  # make inherit from descriptor class and check type annotations (remove descriptors)
+class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rework?
     def __init__(
         self,
         MAX_FRAME_SIZE: Optional[
@@ -32,7 +33,7 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class and check typ
     ) -> None:
         """
         Initializes the maximum frame size and masking parameters.
-        Generates random mask key using MaskKeyGenerator class.
+        Generates random mask key using MaskKey class.
 
         Args:
             MAX_FRAME_SIZE integer: determines what the maximum frame size created should be.
@@ -42,9 +43,10 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class and check typ
         self.MAX_FRAME_SIZE = MAX_FRAME_SIZE  # set MAX_FRAME_SIZE.
         self.IS_MASKED = IS_MASKED  # set IS_MASKED.
 
+        self._frame_types = FrameOpcodes()
         self.mask_key_generator = (
-            MaskKeyGenerator()
-        )  # Initialise an instance of the MaskKeyGenerator under mask_key_generator (Composition).
+            MaskKey()
+        )  # Initialise an instance of the MaskKey under mask_key_generator (Composition).
 
     def _generate_frame(
         self,
@@ -90,8 +92,8 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class and check typ
                 frame.extend(
                     mask_key
                 )  # Append masking key to the end of the frame. (4)
-                masked_payload = bytes(
-                    payload[i] ^ mask_key[i % 4] for i in range(payload_length)
+                masked_payload = MaskKey.mask_payload(
+                    payload=payload, mask_key=mask_key, payload_length=payload_length
                 )  # Perform masking operation on the payload. (5)
                 frame.extend(
                     masked_payload
@@ -120,8 +122,8 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class and check typ
                 frame.extend(
                     mask_key
                 )  # Append masking key to the end of the frame. (4)
-                masked_payload = bytes(
-                    payload[i] ^ mask_key[i % 4] for i in range(payload_length)
+                masked_payload = MaskKey.mask_payload(
+                    payload=payload, mask_key=mask_key, payload_length=payload_length
                 )  # Perform masking operation on the payload. (5)
                 frame.extend(
                     masked_payload
@@ -149,8 +151,8 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class and check typ
                 frame.extend(
                     mask_key
                 )  # Append masking key to the end of the frame. (4)
-                masked_payload = bytes(
-                    payload[i] ^ mask_key[i % 4] for i in range(payload_length)
+                masked_payload = MaskKey.mask_payload(
+                    payload=payload, mask_key=mask_key, payload_length=payload_length
                 )  # Perform masking operation on the payload. (5)
                 frame.extend(
                     masked_payload
@@ -173,7 +175,11 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class and check typ
             0x0 if a continuation frame, and 0x1 if final frame of message,
             (0x0 denoting continuation frame as stated in RFC6455 5.2).
         """
-        return 0x0 if (i + self.MAX_FRAME_SIZE) < self.payload_length else 0x1
+        return (
+            self._frame_types.continuation
+            if (i + self.MAX_FRAME_SIZE) < self.payload_length
+            else self._frame_types.text
+        )
 
     def encode_payload_to_frames(
         self, payload: Optional[str] = "", opcode: Optional[bytes] = 0x1
