@@ -16,18 +16,36 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-from typing import Final, List
+
+from typing import Final, List, Optional
 
 
-__all__: Final[List[str]] = ["MaskKeyGenerator"]
+__all__: Final[List[str]] = ["MaskKey"]
 
 
-class MaskKeyGenerator:  # give type annotations and comments + make inherit from descriptor class
-    def random(self) -> int:
-        self.seed = (self.seed * 1664525 + 1013904223) & 0xFFFFFFFF
-        return (self.seed >> 24) & 0xFF
+class MaskKey:  # comments + make inherit from descriptor class
+    @staticmethod
+    def mask_payload(payload: bytes, mask_key: bytearray, payload_length: int) -> bytes:
+        masked_payload: bytes = bytes(
+            payload[i] ^ mask_key[i % 4] for i in range(payload_length)
+        )
 
-    def generate_masking_key(self, seed=1234) -> bytearray:
-        self.seed = seed
-        masking_key = bytearray(self.random() for _ in range(4))
+        return masked_payload
+
+    @staticmethod
+    def unmask_payload(encoded_payload: bytearray, mask_key: bytearray) -> bytes:
+        unmasked_payload: list[int] = [
+            byte ^ mask_key[i % 4] for i, byte in enumerate(encoded_payload)
+        ]
+
+        payload_data = bytes(unmasked_payload)
+        return payload_data
+
+    @staticmethod
+    def random(seed: int) -> int:
+        seed = (seed * 1664525 + 1013904223) & 0xFFFFFFFF
+        return (seed >> 24) & 0xFF
+
+    def generate_masking_key(self, seed: Optional[int] = 1234) -> bytearray:
+        masking_key: bytearray = bytearray(self.random(seed=seed) for _ in range(4))
         return masking_key
