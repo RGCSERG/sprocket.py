@@ -31,7 +31,9 @@ Welcome to the default.\r\n
 __all__: Final[List[str]] = ["ServerSocketImpl"]
 
 
-class ServerSocketImpl(ServerSocketBaseImpl):
+class ServerSocketImpl(
+    ServerSocketBaseImpl
+):  # rework with new frame encoder and websocketframe class updates + comments
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
