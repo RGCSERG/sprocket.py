@@ -16,13 +16,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
+
 from typing import Final, List
 
 
 __all__: Final[List[str]] = ["WebsocketFrame"]
 
 
-class WebsocketFrame:  # Add type annotations + inherit from descriptor class + rework
+class WebsocketFrame:
     """Python class that represents a simple WebSocket frame.
     Provides methods for parsing WebSocket frame messages,
     extracting its components, and returning the payload data."""
