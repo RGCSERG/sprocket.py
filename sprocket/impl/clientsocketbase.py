@@ -19,7 +19,7 @@ SOFTWARE."""
 import random, select, socket, threading, time, re
 from typing import Any, Final, List, Optional
 from loguru import logger
-from ..models.controlframes import *
+from ..models.frameopcodes import *
 from ..models.frameencoder import *
 from ..models.websocketframe import *
 from ..sockets.clientsocket import *
@@ -30,7 +30,9 @@ from ..functions.checktcpport import *
 __all__: Final[List[str]] = ["ClientSocketBaseImpl"]
 
 
-class ClientSocketBaseImpl(ClientSocket):
+class ClientSocketBaseImpl(
+    ClientSocket
+):  # rework with new frame encoder and websocketframe class updates + comments
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
@@ -72,7 +74,7 @@ class ClientSocketBaseImpl(ClientSocket):
         self._frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=IS_MASKED
         )
-        self._control_frame_types = ControlFrame()
+        self._frame_types = FrameOpcodes()
         self._event_handlers = {}
 
         self._setup_socket()
@@ -81,21 +83,21 @@ class ClientSocketBaseImpl(ClientSocket):
 
     def _check_control_frame(self, opcode: bytes, client_socket: socket) -> None:
         # Handle control frames
-        if opcode == self._control_frame_types.close:
+        if opcode == self._frame_types.close:
             self._close_socket(client_socket=client_socket)
             return
-        if opcode == self._control_frame_types.ping:
+        if opcode == self._frame_types.ping:
             logger.debug(f"Received Ping from {client_socket}")
             self._pong(client_socket=client_socket)
             return
-        if opcode == self._control_frame_types.pong:
+        if opcode == self._frame_types.pong:
             logger.success(f"Received Pong from {client_socket}")
             return
 
     def _pong(self, client_socket: socket) -> None:
         # Send Pong response
         self.send_websocket_message(
-            client_socket=client_socket, opcode=self._control_frame_types.pong
+            client_socket=client_socket, opcode=self._frame_types.pong
         )
 
     def _handle_websocket_message(self, client_socket: socket) -> None:

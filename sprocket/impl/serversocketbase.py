@@ -21,7 +21,7 @@ from typing import Any, Final, List, NoReturn, Optional
 from loguru import logger
 from ..models.websocketframe import *
 from ..models.frameencoder import *
-from ..models.controlframes import *
+from ..models.frameopcodes import *
 from ..sockets.serversocket import *
 
 __all__: Final[List[str]] = ["ServerSocketBaseImpl"]
@@ -34,7 +34,9 @@ default response\r\n
 </BODY></HTML>\r\n\r\n"""
 
 
-class ServerSocketBaseImpl(ServerSocket):
+class ServerSocketBaseImpl(
+    ServerSocket
+):  # rework with new frame encoder and websocketframe class updates + comments
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
@@ -74,7 +76,7 @@ class ServerSocketBaseImpl(ServerSocket):
         self._frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=IS_MASKED
         )
-        self._control_frame_types = ControlFrame()
+        self._frame_types = FrameOpcodes()
 
         self._setup_socket()
 
@@ -273,20 +275,20 @@ class ServerSocketBaseImpl(ServerSocket):
         return (method, target, http_version, headers_map)
 
     def _check_control_frame(self, opcode: bytes, client_socket: socket) -> None:
-        if opcode == self._control_frame_types.close:
+        if opcode == self._frame_types.close:
             self._close_socket(client_socket=client_socket)
             return
-        if opcode == self._control_frame_types.ping:
+        if opcode == self._frame_types.ping:
             logger.debug(f"Recived Ping from {client_socket}")
             self._pong(client_socket=client_socket)
             return
-        if opcode == self._control_frame_types.pong:
+        if opcode == self._frame_types.pong:
             logger.debug(f"Recived Pong from {client_socket}")
             return
 
     def _pong(self, client_socket: socket) -> None:
         self.send_websocket_message(
-            client_socket=client_socket, opcode=self._control_frame_types.pong
+            client_socket=client_socket, opcode=self._frame_types.pong
         )
 
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
@@ -375,7 +377,7 @@ class ServerSocketBaseImpl(ServerSocket):
                 self._ws_sockets.remove(client_socket)
             self._input_sockets.remove(client_socket)
             self.send_websocket_message(
-                client_socket=client_socket, opcode=self._control_frame_types.close
+                client_socket=client_socket, opcode=self._frame_types.close
             )
             self.leave_room(client_socket=client_socket)
             client_socket.close()

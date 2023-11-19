@@ -26,7 +26,9 @@ from .clientsocketbase import *
 __all__: Final[List[str]] = ["ClientSocketImpl"]
 
 
-class ClientSocketImpl(ClientSocketBaseImpl):
+class ClientSocketImpl(
+    ClientSocketBaseImpl
+):  # rework with new frame encoder and websocketframe class updates + comments
     def __init__(
         self,
         TCP_HOST: Optional[str] = "localhost",
@@ -107,7 +109,7 @@ class ClientSocketImpl(ClientSocketBaseImpl):
         """
         logger.warning("Sending Close Frame")
         if self._socket_open:
-            self.send_websocket_message(opcode=self._control_frame_types.close)
+            self.send_websocket_message(opcode=self._frame_types.close)
 
     def ping(self) -> None:
         """
@@ -115,7 +117,7 @@ class ClientSocketImpl(ClientSocketBaseImpl):
         """
         if self._socket_open:
             logger.debug("Activating Ping")
-            self.send_websocket_message(opcode=self._control_frame_types.ping)
+            self.send_websocket_message(opcode=self._frame_types.ping)
 
     def on(self, event: str, handler: Callable) -> None:
         """
