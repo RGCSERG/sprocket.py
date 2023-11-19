@@ -19,13 +19,20 @@ SOFTWARE."""
 from typing import Final, List
 from pydantic import BaseModel
 
-__all__: Final[List[str]] = ["ControlFrame"]
+__all__: Final[List[str]] = ["FrameOpcodes"]
 
 
-class ControlFrame(BaseModel):
-    """Amount of bytes for each respective control frame in accordance with websocket protocol"""
+class FrameOpcodes(BaseModel):
+    """
+    Amount of bytes for each respective control frame in accordance with websocket protocol,
+    (using specific control frame values defined in https://datatracker.ietf.org/doc/html/rfc6455)
 
-    # Specific control frames defined in https://datatracker.ietf.org/doc/html/rfc6455
-    close: bytes = 0x8
-    ping: bytes = 0x9
-    pong: bytes = 0xA
+    0x3-7 and 0xB-F are reserved (non-control/control frames respectively)
+    """
+
+    continuation: bytes = 0x0  # Denotes continuation frame.
+    text: bytes = 0x1  # Denotes text frame.
+    binary: bytes = 0x2  # Denotes binary frame.
+    close: bytes = 0x8  # Denotes connection close frame.
+    ping: bytes = 0x9  # Denotes ping frame.
+    pong: bytes = 0xA  # Denotes pong frame.
