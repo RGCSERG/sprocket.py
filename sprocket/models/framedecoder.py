@@ -277,7 +277,7 @@ class WebsocketFrameDecoder:  # inherit from descriptor class + comments
 
         if self._mask:  # If the frame's mask bit is True.
             self._mask_key = data_in_bytes[
-                self._mask_key_start : self._mask_key_start
+                self._start_mask_key : self._start_mask_key
                 + 4  # Masking key is 4 bytes long, so add four to mark the end of the masking key.
             ]  # Retrieve masking key.
 
@@ -294,9 +294,9 @@ class WebsocketFrameDecoder:  # inherit from descriptor class + comments
             self._payload_length
         ):  # For efficiancy, this checks weather there is anything to retrieve.
             payload_start = (
-                self._mask_key_start + 4
+                self._start_mask_key + 4
                 if self._mask
-                else self._mask_key_start  # Checks if the message is masked, setting payload start accordingly.
+                else self._start_mask_key  # Checks if the message is masked, setting payload start accordingly.
             )
             encoded_payload = data_in_bytes[
                 payload_start : payload_start
@@ -305,7 +305,7 @@ class WebsocketFrameDecoder:  # inherit from descriptor class + comments
             ]
 
             if self._mask:  # If the payload is masked, it must be decoded.
-                MaskKey.decode_payload(
+                MaskKey.unmask_payload(
                     encoded_payload=encoded_payload,
                     mask_key=self._mask_key,
                 )  # Decode payload (abstracted by other class).
