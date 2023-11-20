@@ -17,9 +17,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 
-from typing import Final, List, Optional
+from typing import Final, List, Literal, Optional
 from .maskkey import *
 from ..exceptions import *
+
+
+"""
+All comments refering to binary operations will assume the structure of a btye to be as such;
+
+0b  1   1   1   1   1   1   1   1 # Binary value
+0b  8th 7th 6th 5th 4th 3rd 2nd 1st # Position
+0b  128 64  32  16  8   4   2   1 # Denary value
+"""
 
 
 __all__: Final[List[str]] = ["WebsocketFrameDecoder"]
@@ -31,54 +40,188 @@ class WebsocketFrameDecoder:  # inherit from descriptor class + comments
     extracting its components, and returning the payload data."""
 
     def __init__(self, status: Optional[bool] = True) -> None:
-        self.status = status
+        """
+        Initialises the individual parts of the websocket frame,
+        where status defines weather the machine running the code is either a client or remote host.
 
-        self._fin: int = 0
-        self._rsv1: int = 0
-        self._rsv2: int = 0
-        self._rsv3: int = 0
-        self._opcode: int = 0
-        self._mask: int = 0
-        self._payload_length: bytes = 0
-        self._mask_key: bytearray = None
-        self._payload_data: bytes = b""
+        Args:
+            status bool: determines weather a machine is a client or remote host,
+            defaults to a client (true), server = false.
+        """
+
+        self.status = status  # Status, defining machines type.
+
+        self._fin: int = 0  # Fin bit.
+        self._rsv1: int = 0  # Rsv1 bit.
+        self._rsv2: int = 0  # Rsv2 bit.
+        self._rsv3: int = 0  # Rsv3 bit.
+        self._opcode: int = 0  # Frame's Opcode.
+        self._mask: int = 0  # Mask bit (1/0 for true/false respectively).
+        self._payload_length: bytes = 0  # Payload length.
+        self._mask_key: bytearray = None  # Mask key (if masked), for decoding.
+        self._payload_data: bytes = b""  # Actualy decoded payload (in bytes).
 
     @property
     def payload_data(self) -> bytes:
+        """
+        Property Method for retrieving private attribute _payload_data,
+        used by <instance>.<property> .
+
+        Returns:
+            _payload_data bytes: Payload data of the frame given.
+        """
         return self._payload_data
 
     @property
     def opcode(self) -> int:
+        """
+        Property Method for retrieving private attribute _opcode,
+        used by <instance>.<property> .
+
+        Returns:
+            _opcode int: Opcode in integer form of the frame.
+        """
         return self._opcode
 
     @staticmethod
     def _parse_fin_bit(first_byte: bytes) -> int:
-        return (first_byte & 0x80) >> 7
+        """
+        Static method used to retrieve (parse) the fin bit from any given frame.
+
+        This method is static as it does not rely of the instance of the class.
+
+        Args:
+            first_byte bytes: First byte of the frame.
+
+        Returns:
+            fin int: The most significant (8th) bit (fin bit) of the frame.
+        """
+        fin = (
+            first_byte  # Perform AND operator (&) with operand 0x80 (binary: 10000000, denary: 128) on the first byte,
+            & 0x80  # This isolates the fin bit, by only giving a successful and operation for the 8th bit.
+        ) >> 7  # Then Right-shift (>>) the result by 7 positions moves the isolated bit to the 1st position (least significant bit).
+        return fin
 
     @staticmethod
     def _parse_rsv1_bit(first_byte: bytes) -> int:
-        return (first_byte & 0x40) >> 6
+        """
+        Static method used to retrieve (parse) the rsv1 bit from any given frame.
+
+        This method is static as it does not rely of the instance of the class.
+
+        Args:
+            first_byte bytes: First byte of the frame.
+
+        Returns:
+            rsv1 int: The 7th bit (rsv1 bit) of the frame.
+        """
+        rsv1 = (
+            first_byte  # Perform AND operator (&) with operand 0x40 (binary: 01000000, denary: 64) on the first byte,
+            & 0x40  # This isolates the rsv1 bit, by only giving a successful and operation for the 7th bit.
+        ) >> 6  # Then Right-shift (>>) the result by 6 positions moves the isolated bit to the 1st position (least significant bit).
+        return rsv1
 
     @staticmethod
     def _parse_rsv2_bit(first_byte: bytes) -> int:
-        return (first_byte & 0x20) >> 5
+        """
+        Static method used to retrieve (parse) the rsv2 bit from any given frame.
+
+        This method is static as it does not rely of the instance of the class.
+
+        Args:
+            first_byte bytes: First byte of the frame.
+
+        Returns:
+            rsv2 int: The 6th bit (rsv2 bit) of the frame.
+        """
+        rsv2 = (
+            first_byte  # Perform AND operator (&) with operand 0x20 (binary: 00100000, denary: 32) on the first byte,
+            & 0x20  # This isolates the rsv2 bit, by only giving a successful and operation for the 6th bit.
+        ) >> 5  # Then Right-shift (>>) the result by 5 positions moves the isolated bit to the 1st position (least significant bit).
+        return rsv2
 
     @staticmethod
     def _parse_rsv3_bit(first_byte: bytes) -> int:
-        return (first_byte & 0x10) >> 4
+        """
+        Static method used to retrieve (parse) the rsv3 bit from any given frame.
+
+        This method is static as it does not rely of the instance of the class.
+
+        Args:
+            first_byte bytes: First byte of the frame.
+
+        Returns:
+            rsv3 int: The 5th bit (rsv3 bit) of the frame.
+        """
+        rsv3 = (
+            first_byte  # Perform AND operator (&) with operand 0x10 (binary: 00010000, denary: 16) on the first byte,
+            & 0x10  # This isolates the rsv3 bit, by only giving a successful and operation for the 5th bit.
+        ) >> 4  # Then Right-shift (>>) the result by 4 positions moves the isolated bit to the 1st position (least significant bit).
+        return rsv3
 
     @staticmethod
     def _parse_opcode(first_byte: bytes) -> int:
-        return first_byte & 0xF
+        """
+        Static method used to retrieve (parse) the opcode from any given frame.
+
+        This method is static as it does not rely of the instance of the class.
+
+        Args:
+            first_byte bytes: First byte of the frame.
+
+        Returns:
+            opcode int: The second half (4th - 1st) of the first byte (opcode) of the frame, in integer form.
+        """
+        opcode = (
+            first_byte  # Perform AND operator (&) with operand 0xF (binary: 00001111, denary: 15) on the first byte,
+            & 0xF  # This isolates the opcode, by only giving a successful and operation for the second half of the first byte.
+        )  # This does not require Right-shifting as the result is already in least significant position it can be in.
+        return opcode
 
     @staticmethod
     def _parse_mask(second_byte: bytes) -> int:
-        return (second_byte & 0x80) >> 7
+        """
+        Static method used to retrieve (parse) the mask bit from any given frame.
+
+        This method is static as it does not rely of the instance of the class.
+
+        Args:
+            second_byte bytes: Second byte of the frame.
+
+        Returns:
+            mask int: The most significant (8th) bit (mask bit) of the second byte, of the frame.
+        """
+        mask = (
+            second_byte  # Perform AND operator (&) with operand 0x80 (binary: 10000000, denary: 128) on the second byte,
+            & 0x80  # This isolates the mask bit, by only giving a successful and operation for the 8th bit.
+        ) >> 7  # Then Right-shift (>>) the result by 7 positions moves the isolated bit to the 1st position (least significant bit).
+        return mask
 
     @staticmethod
-    def _parse_payload_length(data_in_bytes: bytearray):
-        payload_length = data_in_bytes[1] & 0x7F
-        start_mask_key = 2
+    def _parse_payload_length(
+        data_in_bytes: bytearray,
+    ) -> tuple[int, Literal[10, 4, 2]]:
+        """
+        Static method used to retrieve (parse) the payload length from any given frame.
+
+        This method is static as it does not rely of the instance of the class.
+
+        Args:
+            data_in_bytes bytearray: Whole frame in the form of an bytearray.
+
+        Returns:
+            tuple[
+                payload_length int: Length of the payload in integer form.
+                start_mask_key Literal[10, 4, 2]: Start of the masking key (if masked), within the frame.
+            ]
+        """
+        payload_length = (
+            data_in_bytes[
+                1
+            ]  # Perform AND operator (&) with operand 0x7F (binary: 01111111, denary: 127) on the second byte,
+            & 0x7F  # This isolates the payload length from the mask bit, by enforcing a failed operation for the 8th bit.
+        )  # This does not require Right-shifting as the result is already in least significant position it can be in.
+        start_mask_key = 2  # Set start_mask_key to default position (3rd byte).
 
         if payload_length == 0x7E:
             payload_length = int.from_bytes(data_in_bytes[2:4], byteorder="big")
