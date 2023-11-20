@@ -16,20 +16,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-
-from datetime import datetime
-
-from .impl.serversocket import *
-from .sockets.serversocket import *
-from .impl.clientsocket import *
-from .sockets.clientsocket import *
-from .models import *
-from .exceptions import *
-
-__version__ = "0.0.0"
-__author__ = "RGCSERG"
-__copyright__ = f"Copyright (c) {datetime.now().strftime('%Y')} RGCSERG"
-__email__ = ""
-__description__ = "Websocket Server Libary"
-__license__ = "MIT"
-__github__ = "https://github.com/RGCSERG/sprocket.py"
+from .framedecoder import *
+from .frameencoder import *
+from .frameopcodes import *
+from .maskkey import *
+from .websocketframe import *
