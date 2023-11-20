@@ -2,7 +2,7 @@
     "python.testing.unittestArgs": [
         "-v",
         "-s",
-        "./sprocket",
+        "./sprocket/tests",
         "-p",
         "*_test.py"
     ],
