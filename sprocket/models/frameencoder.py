@@ -32,7 +32,7 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
         IS_MASKED: Optional[bool] = True,  # Defaults to True (client).
     ) -> None:
         """
-        Initializes the maximum frame size and masking parameters.
+        Initialises the maximum frame size and masking parameters.
         Generates random mask key using MaskKey class.
 
         Args:
