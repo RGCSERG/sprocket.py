@@ -27,10 +27,10 @@ class TestEncodeToDecode(unittest.TestCase):
         """
         self.encoder_masked = WebSocketFrameEncoder(IS_MASKED=True)
         self.encoder_unmasked = WebSocketFrameEncoder(IS_MASKED=False)
-        self.default_decoder = WebsocketFrameDecoder()
+        self.default_decoder = WebsocketFrameDecoder(status=True)
         self.server_decoder = WebsocketFrameDecoder(status=False)
 
-    def _decode_message(self, frames: list) -> str:
+    def unmasked_decode_message(self, frames: list) -> str:
         data_in_bytes = b""
         final_message = ""
 
@@ -38,13 +38,42 @@ class TestEncodeToDecode(unittest.TestCase):
             data_in_bytes = frame
             if not self._is_final_frame(data_in_bytes):
                 # This is a fragmented frame
-                self.decoder.decode_websocket_message(data_in_bytes=data_in_bytes)
-                message_payload = self.decoder.payload_data
+                self.default_decoder.decode_websocket_message(
+                    data_in_bytes=data_in_bytes
+                )
+                message_payload = self.default_decoder.payload_data
                 final_message += message_payload.decode("utf-8")
             else:
                 # This is a non-fragmented frame
-                self.decoder.decode_websocket_message(data_in_bytes=data_in_bytes)
-                message_payload = self.decoder.payload_data
+                self.default_decoder.decode_websocket_message(
+                    data_in_bytes=data_in_bytes
+                )
+                message_payload = self.default_decoder.payload_data
+                final_message += message_payload.decode("utf-8")
+
+        if final_message and data_in_bytes:
+            data_in_bytes = b""
+            return final_message
+
+    def masked_decode_message(self, frames: list) -> str:
+        data_in_bytes = b""
+        final_message = ""
+
+        for frame in frames:
+            data_in_bytes = frame
+            if not self._is_final_frame(data_in_bytes):
+                # This is a fragmented frame
+                self.server_decoder.decode_websocket_message(
+                    data_in_bytes=data_in_bytes
+                )
+                message_payload = self.server_decoder.payload_data
+                final_message += message_payload.decode("utf-8")
+            else:
+                # This is a non-fragmented frame
+                self.server_decoder.decode_websocket_message(
+                    data_in_bytes=data_in_bytes
+                )
+                message_payload = self.server_decoder.payload_data
                 final_message += message_payload.decode("utf-8")
 
         if final_message and data_in_bytes:
@@ -64,14 +93,9 @@ class TestEncodeToDecode(unittest.TestCase):
         data_2 = self.encoder_unmasked.encode_payload_to_frames(payload=payload_2)
         data_3 = self.encoder_unmasked.encode_payload_to_frames(payload=payload_3)
 
-        self.server_decoder.decode_websocket_message(data_in_bytes=data_1)
-        decoded_data_1 = self.server_decoder.payload_data.decode()
-
-        self.server_decoder.decode_websocket_message(data_in_bytes=data_2)
-        decoded_data_2 = self.server_decoder.payload_data.decode()
-
-        self.server_decoder.decode_websocket_message(data_in_bytes=data_3)
-        decoded_data_3 = self.server_decoder.payload_data.decode()
+        decoded_data_1 = self.unmasked_decode_message(frames=data_1)
+        decoded_data_2 = self.unmasked_decode_message(frames=data_2)
+        decoded_data_3 = self.unmasked_decode_message(frames=data_3)
 
         self.assertEqual(payload_1, decoded_data_1)
         self.assertEqual(payload_2, decoded_data_2)
@@ -86,14 +110,9 @@ class TestEncodeToDecode(unittest.TestCase):
         data_2 = self.encoder_masked.encode_payload_to_frames(payload=payload_2)
         data_3 = self.encoder_masked.encode_payload_to_frames(payload=payload_3)
 
-        self.default_decoder.decode_websocket_message(data_in_bytes=data_1)
-        decoded_data_1 = self.default_decoder.payload_data.decode()
-
-        self.default_decoder.decode_websocket_message(data_in_bytes=data_2)
-        decoded_data_2 = self.default_decoder.payload_data.decode()
-
-        self.default_decoder.decode_websocket_message(data_in_bytes=data_3)
-        decoded_data_3 = self.default_decoder.payload_data.decode()
+        decoded_data_1 = self.masked_decode_message(frames=data_1)
+        decoded_data_2 = self.masked_decode_message(frames=data_2)
+        decoded_data_3 = self.masked_decode_message(frames=data_3)
 
         self.assertEqual(payload_1, decoded_data_1)
         self.assertEqual(payload_2, decoded_data_2)
