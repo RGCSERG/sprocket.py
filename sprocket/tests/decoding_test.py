@@ -25,10 +25,10 @@ class TestWebSocketFrameEncoder(unittest.TestCase):
         """
         Create an instance of each class.
         """
-        self.default_decoder = WebsocketFrameDecoder()
+        self.default_decoder = WebsocketFrameDecoder(status=True)
         self.server_decoder = WebsocketFrameDecoder(status=False)
 
-    def test_default_init(self):
+    def test_masked_init(self):
         self.assertTrue(self.default_decoder.status)
         self.assertEqual(self.default_decoder._fin, 0)
         self.assertEqual(self.default_decoder._rsv1, 0)
@@ -40,7 +40,7 @@ class TestWebSocketFrameEncoder(unittest.TestCase):
         self.assertIsNone(self.default_decoder._mask_key)
         self.assertEqual(self.default_decoder._payload_data, b"")
 
-    def test_custom_init(self):
+    def test_unmasked_init(self):
         self.assertFalse(self.server_decoder.status)
         self.assertEqual(self.server_decoder._fin, 0)
         self.assertEqual(self.server_decoder._rsv1, 0)
