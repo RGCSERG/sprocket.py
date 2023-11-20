@@ -303,7 +303,7 @@ class WebsocketFrameDecoder:  # inherit from descriptor class + comments
             ]  # Retrieves payload.
 
             if self._mask:  # If the payload is masked, it must be decoded.
-                MaskKey.unmask_payload(
+                payload_data = MaskKey.unmask_payload(
                     encoded_payload=encoded_payload,
                     mask_key=self._mask_key,
                 )  # Decode payload (abstracted by other class).
