@@ -299,10 +299,8 @@ class WebsocketFrameDecoder:  # inherit from descriptor class + comments
                 else self._start_mask_key  # Checks if the message is masked, setting payload start accordingly.
             )
             encoded_payload = data_in_bytes[
-                payload_start : payload_start
-                + self._payload_length
-                // 8  # Retrieves payload, self.payload length is divided by 8, so the value is in bytes not bits.
-            ]
+                payload_start : payload_start + self._payload_length
+            ]  # Retrieves payload.
 
             if self._mask:  # If the payload is masked, it must be decoded.
                 MaskKey.unmask_payload(
