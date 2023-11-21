@@ -25,5 +25,5 @@ __all__: Final[List[str]] = ["check_frame_size"]
 def check_frame_size(MAX_FRAME_SIZE: int) -> bool:
     """Checks if frame size is a viable number."""
 
-    # value has to be greater than minimum frame size
-    return MAX_FRAME_SIZE > 112
+    # value has to be greater than minimum frame size (112)
+    return MAX_FRAME_SIZE > 0x70
