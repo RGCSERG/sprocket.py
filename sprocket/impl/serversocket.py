@@ -40,8 +40,7 @@ class ServerSocketImpl(
         TCP_PORT: Optional[int] = 1000,
         TCP_BUFFER_SIZE: Optional[int] = 8192,
         WS_ENDPOINT: Optional[str] = "/websocket",
-        MAX_FRAME_SIZE: Optional[int] = 125,  # Add error checking
-        IS_MASKED: Optional[bool] = True,
+        MAX_FRAME_SIZE: Optional[int] = 125,
         DEFAULT_HTTP_RESPONSE: Optional[bytes] = DEFAULT_HTTP_RESPONSE,
         WEBSOCKET_GUID: Optional[str] = None,
         BACKLOG: Optional[int] = 5,
@@ -53,7 +52,6 @@ class ServerSocketImpl(
             TCP_BUFFER_SIZE=TCP_BUFFER_SIZE,
             WS_ENDPOINT=WS_ENDPOINT,
             MAX_FRAME_SIZE=MAX_FRAME_SIZE,
-            IS_MASKED=IS_MASKED,
             TIMEOUT=TIMEOUT,
             DEFAULT_HTTP_RESPONSE=DEFAULT_HTTP_RESPONSE,
             WEBSOCKET_GUID=WEBSOCKET_GUID,

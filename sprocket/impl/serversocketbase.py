@@ -44,7 +44,6 @@ class ServerSocketBaseImpl(
         TCP_BUFFER_SIZE: Optional[int] = 8192,
         WS_ENDPOINT: Optional[str] = "/websocket",
         MAX_FRAME_SIZE: Optional[int] = 125,
-        IS_MASKED: Optional[bool] = True,
         TIMEOUT: Optional[int] = 5,
         DEFAULT_HTTP_RESPONSE: Optional[bytes] = DEFAULT_HTTP_RESPONSE,
         WEBSOCKET_GUID: Optional[str] = None,
@@ -74,7 +73,7 @@ class ServerSocketBaseImpl(
         self._ws_sockets = []
         self._frame_decoder = WebsocketFrame()
         self._frame_encoder = WebSocketFrameEncoder(
-            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=IS_MASKED
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True
         )
         self._frame_types = FrameOpcodes()
 
