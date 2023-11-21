@@ -96,15 +96,38 @@ class TestWebSocketFrameEncoder(unittest.TestCase):
         self.server_decoder.decode_websocket_message(data_in_bytes=data)
 
         decoded_data_2 = self.server_decoder.payload_data.decode()
-        # self.assertEqual("hello", self.server_decoder._mask_key)
+        self.assertEqual(bytearray(b"7\xfa!="), self.server_decoder._mask_key)
         self.assertEqual("Hello", decoded_data_2)
 
     def test_unmasked_decoding(self) -> None:
-        hex_sequence = [0x81, 0x05, 0x48, 0x65, 0x6C, 0x6C, 0x6F]
-        data = bytearray(hex_sequence)
+        hex_sequence_1 = [0x81, 0x05, 0x48, 0x65, 0x6C, 0x6C, 0x6F]
+        hex_sequence_2 = [
+            0x81,
+            0x0B,
+            0x48,
+            0x65,
+            0x6C,
+            0x6C,
+            0x6F,
+            0x20,
+            0x57,
+            0x6F,
+            0x72,
+            0x6C,
+            0x64,
+        ]
 
-        self.default_decoder.decode_websocket_message(data_in_bytes=data)
+        data_1 = bytearray(hex_sequence_1)
+        data_2 = bytearray(hex_sequence_2)
 
-        decoded_data = self.default_decoder.payload_data.decode()
+        self.default_decoder.decode_websocket_message(data_in_bytes=data_1)
 
-        self.assertEqual("Hello", decoded_data)
+        decoded_data_1 = self.default_decoder.payload_data.decode()
+
+        self.assertEqual("Hello", decoded_data_1)
+
+        self.default_decoder.decode_websocket_message(data_in_bytes=data_2)
+
+        decoded_data_2 = self.default_decoder.payload_data.decode()
+
+        self.assertEqual("Hello World", decoded_data_2)
