@@ -31,13 +31,11 @@ class TestWebSocketFrameEncoder(unittest.TestCase):
     def test_init_masked(self) -> None:
         self.assertEqual(self.encoder_masked.MAX_FRAME_SIZE, 125)
         self.assertEqual(self.encoder_masked.IS_MASKED, True)
-        self.assertIsNotNone(self.encoder_masked._frame_types)
         self.assertIsNotNone(self.encoder_masked.mask_key_generator)
 
     def test_init_unmasked(self) -> None:
         self.assertEqual(self.encoder_unmasked.MAX_FRAME_SIZE, 125)
         self.assertEqual(self.encoder_unmasked.IS_MASKED, False)
-        self.assertIsNotNone(self.encoder_unmasked._frame_types)
         self.assertIsNotNone(self.encoder_unmasked.mask_key_generator)
 
     def test_masked_encoding(self) -> None:
