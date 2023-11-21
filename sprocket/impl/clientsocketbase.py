@@ -117,7 +117,7 @@ class ClientSocketBaseImpl(
                 self._frame_decoder.decode_websocket_message(
                     data_in_bytes=data_in_bytes
                 )
-                control_opcode = self._frame_decoder.get_control_opcode()
+                control_opcode = self._frame_decoder.opcode
                 self._check_control_frame(
                     opcode=control_opcode, client_socket=client_socket
                 )
