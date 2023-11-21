@@ -71,7 +71,7 @@ class ServerSocketBaseImpl(
         self._ws_sockets = []
         self._frame_decoder = WebsocketFrameDecoder(status=False)
         self._frame_encoder = WebSocketFrameEncoder(
-            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=False
         )
 
         self._setup_socket()

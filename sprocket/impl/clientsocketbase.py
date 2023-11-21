@@ -63,7 +63,7 @@ class ClientSocketBaseImpl(
         self._socket_open = False
         self._frame_decoder = WebsocketFrameDecoder(status=True)
         self._frame_encoder = WebSocketFrameEncoder(
-            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=False
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True
         )
         self._frame_types = FrameOpcodes()
         self._event_handlers = {}
