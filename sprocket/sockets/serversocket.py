@@ -32,7 +32,6 @@ class ServerSocket(ABC):
         TCP_BUFFER_SIZE: Optional[int],
         WS_ENDPOINT: Optional[str],
         MAX_FRAME_SIZE: Optional[int],
-        IS_MASKED: Optional[bool],
         TIMEOUT: Optional[int],
         DEFAULT_HTTP_RESPONSE: Optional[bytes],
         WEBSOCKET_GUID: Optional[str],
@@ -47,7 +46,6 @@ class ServerSocket(ABC):
             TCP_BUFFER_SIZE int: Buffer size for reading data from TCP sockets.
             WS_ENDPOINT str: The WebSocket endpoint to handle.
             MAX_FRAME_SIZE int: Maximum WebSocket frame size.
-            IS_MASKED bool: Boolean flag indicating if WebSocket frames should be masked.
             TIMEOUT int: Timeout value for socket operations.
             DEFAULT_HTTP_RESPONSE bytes: Default HTTP response for regular HTTP requests.
             WEBSOCKET_GUID str: Unique identifier for WebSocket connections.
@@ -62,7 +60,7 @@ class ServerSocket(ABC):
             _control_frame_types ControlFrame: Instance for WebSocket control frame types.
             _LOCK threading.Lock: Threading lock for synchronizing access to shared resources.
 
-        These attributes collectively form the core of WebSocket server functionality, facilitating socket operations, WebSocket connection management, and frame processing.
+            Subclasses should provide implementations for the abstract methods to create a functional WebSocket system.
         """
         pass
 

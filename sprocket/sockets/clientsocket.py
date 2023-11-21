@@ -33,7 +33,6 @@ class ClientSocket(ABC):
         TCP_KEY: Optional[str] = None,
         TIMEOUT: Optional[int] = 5,
         MAX_FRAME_SIZE: Optional[int] = 125,
-        IS_MASKED: Optional[bool] = True,
     ) -> None:
         """
         Client socket Class.
@@ -45,7 +44,6 @@ class ClientSocket(ABC):
         - TCP_KEY str: The WebSocket key used for the connection.
         - TIMEOUT int: The timeout duration for socket operations.
         - MAX_FRAME_SIZE int: Maximum frame size for WebSocket frames.
-        - IS_MASKED bool: A flag indicating whether WebSocket frames should be masked.
 
         Subclasses should provide implementations for the abstract methods to create a functional WebSocket system.
         """
