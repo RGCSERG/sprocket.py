@@ -19,12 +19,9 @@ SOFTWARE."""
 import random, select, socket, threading, time, re
 from typing import Any, Final, List, Optional
 from loguru import logger
-from ..models.frameopcodes import *
-from ..models.frameencoder import *
-from ..models.websocketframe import *
-from ..sockets.clientsocket import *
-from ..functions.checkframesize import *
-from ..functions.checktcpport import *
+from ..frame_models import WebSocketFrameEncoder, WebsocketFrameDecoder, FrameOpcodes
+from ..sockets import ClientSocket
+from ..functions import check_tcp_port, check_frame_size
 
 
 __all__: Final[List[str]] = ["ClientSocketBaseImpl"]
@@ -64,7 +61,7 @@ class ClientSocketBaseImpl(
         # ---------------------- #
         self._LOCK = threading.Lock()
         self._socket_open = False
-        self._frame_decoder = WebsocketFrame()
+        self._frame_decoder = WebsocketFrameDecoder(status=True)
         self._frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=False
         )
@@ -110,18 +107,22 @@ class ClientSocketBaseImpl(
             data_in_bytes = frame_data
             if not self._is_final_frame(data_in_bytes):
                 # This is a fragmented frame
-                self._frame_decoder.populateFromWebsocketFrameMessage(data_in_bytes)
-                message_payload = self._frame_decoder.get_payload_data()
-                final_message += message_payload.decode("utf-8")
+                self._frame_decoder.decode_websocket_message(
+                    data_in_bytes=data_in_bytes
+                )
+                message_payload = self._frame_decoder.payload_data.decode("utf-8")
+                final_message += message_payload
             else:
                 # This is a non-fragmented frame
-                self._frame_decoder.populateFromWebsocketFrameMessage(data_in_bytes)
+                self._frame_decoder.decode_websocket_message(
+                    data_in_bytes=data_in_bytes
+                )
                 control_opcode = self._frame_decoder.get_control_opcode()
                 self._check_control_frame(
                     opcode=control_opcode, client_socket=client_socket
                 )
-                message_payload = self._frame_decoder.get_payload_data()
-                final_message += message_payload.decode("utf-8")
+                message_payload = self._frame_decoder.payload_data.decode("utf-8")
+                final_message += message_payload
                 break
 
         if final_message and data_in_bytes:

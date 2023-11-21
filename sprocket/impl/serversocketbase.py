@@ -19,10 +19,8 @@ SOFTWARE."""
 import base64, hashlib, random, select, socket, threading, time, re
 from typing import Any, Final, List, NoReturn, Optional
 from loguru import logger
-from ..models.websocketframe import *
-from ..models.frameencoder import *
-from ..models.frameopcodes import *
-from ..sockets.serversocket import *
+from ..frame_models import WebSocketFrameEncoder, WebsocketFrameDecoder, FrameOpcodes
+from ..sockets import ServerSocket
 
 __all__: Final[List[str]] = ["ServerSocketBaseImpl"]
 
@@ -71,11 +69,10 @@ class ServerSocketBaseImpl(
         self._rooms = {}
         self._input_sockets = []
         self._ws_sockets = []
-        self._frame_decoder = WebsocketFrame()
+        self._frame_decoder = WebsocketFrameDecoder(status=False)
         self._frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True
         )
-        self._frame_types = FrameOpcodes()
 
         self._setup_socket()
 
@@ -274,20 +271,20 @@ class ServerSocketBaseImpl(
         return (method, target, http_version, headers_map)
 
     def _check_control_frame(self, opcode: bytes, client_socket: socket) -> None:
-        if opcode == self._frame_types.close:
+        if opcode == FrameOpcodes.close:
             self._close_socket(client_socket=client_socket)
             return
-        if opcode == self._frame_types.ping:
+        if opcode == FrameOpcodes.ping:
             logger.debug(f"Recived Ping from {client_socket}")
             self._pong(client_socket=client_socket)
             return
-        if opcode == self._frame_types.pong:
+        if opcode == FrameOpcodes.pong:
             logger.debug(f"Recived Pong from {client_socket}")
             return
 
     def _pong(self, client_socket: socket) -> None:
         self.send_websocket_message(
-            client_socket=client_socket, opcode=self._frame_types.pong
+            client_socket=client_socket, opcode=FrameOpcodes.pong
         )
 
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
@@ -311,18 +308,22 @@ class ServerSocketBaseImpl(
             data_in_bytes = frame_data
             if not self._is_final_frame(data_in_bytes):
                 # This is a fragmented frame
-                self._frame_decoder.populateFromWebsocketFrameMessage(data_in_bytes)
-                message_payload = self._frame_decoder.get_payload_data()
-                final_message += message_payload.decode("utf-8")
+                self._frame_decoder.decode_websocket_message(
+                    data_in_bytes=data_in_bytes
+                )
+                message_payload = self._frame_decoder.payload_data.decode("utf-8")
+                final_message += message_payload
             else:
                 # This is a non-fragmented frame
-                self._frame_decoder.populateFromWebsocketFrameMessage(data_in_bytes)
+                self._frame_decoder.decode_websocket_message(
+                    data_in_bytes=data_in_bytes
+                )
                 control_opcode = self._frame_decoder.get_control_opcode()
                 self._check_control_frame(
                     opcode=control_opcode, client_socket=client_socket
                 )
-                message_payload = self._frame_decoder.get_payload_data()
-                final_message += message_payload.decode("utf-8")
+                message_payload = self._frame_decoder.payload_data.decode("utf-8")
+                final_message += message_payload
                 break
 
         if final_message and data_in_bytes:
@@ -376,7 +377,7 @@ class ServerSocketBaseImpl(
                 self._ws_sockets.remove(client_socket)
             self._input_sockets.remove(client_socket)
             self.send_websocket_message(
-                client_socket=client_socket, opcode=self._frame_types.close
+                client_socket=client_socket, opcode=FrameOpcodes.close
             )
             self.leave_room(client_socket=client_socket)
             client_socket.close()
