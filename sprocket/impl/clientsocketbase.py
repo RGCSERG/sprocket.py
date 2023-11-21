@@ -41,7 +41,6 @@ class ClientSocketBaseImpl(
         TCP_KEY: Optional[str] = None,
         TIMEOUT: Optional[int] = 5,
         MAX_FRAME_SIZE: Optional[int] = 125,
-        IS_MASKED: Optional[bool] = True,
     ) -> None:
         # Constructor Method
         if TCP_PORT is not None and not check_tcp_port(TCP_PORT=TCP_PORT):
@@ -49,12 +48,6 @@ class ClientSocketBaseImpl(
         else:
             # set _TCP_PORT to default value
             self._TCP_PORT = TCP_PORT
-
-        if TCP_KEY is not None:
-            self._TCP_KEY = TCP_KEY
-        else:
-            # Generate a random WebSocket key for each instance
-            self._TCP_KEY = self._generate_random_websocket_key()
 
         if MAX_FRAME_SIZE is not None and not check_frame_size(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE
@@ -64,6 +57,7 @@ class ClientSocketBaseImpl(
             # value not set in this class
             pass
 
+        self._TCP_KEY = self._generate_random_websocket_key()
         self._TCP_HOST = TCP_HOST
         self._TCP_BUFFER_SIZE = TCP_BUFFER_SIZE
         self._TIMEOUT = TIMEOUT
@@ -72,7 +66,7 @@ class ClientSocketBaseImpl(
         self._socket_open = False
         self._frame_decoder = WebsocketFrame()
         self._frame_encoder = WebSocketFrameEncoder(
-            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=IS_MASKED
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=False
         )
         self._frame_types = FrameOpcodes()
         self._event_handlers = {}

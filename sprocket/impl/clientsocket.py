@@ -37,7 +37,6 @@ class ClientSocketImpl(
         TCP_KEY: Optional[str] = None,
         TIMEOUT: Optional[int] = 5,
         MAX_FRAME_SIZE: Optional[int] = 125,
-        IS_MASKED: Optional[bool] = True,
     ) -> None:
         super().__init__(
             TCP_HOST=TCP_HOST,
@@ -46,7 +45,6 @@ class ClientSocketImpl(
             TCP_KEY=TCP_KEY,
             TIMEOUT=TIMEOUT,
             MAX_FRAME_SIZE=MAX_FRAME_SIZE,
-            IS_MASKED=IS_MASKED,
         )
 
         self.ID = random.randint(1000000, 9999999)
