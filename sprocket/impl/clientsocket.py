@@ -34,7 +34,6 @@ class ClientSocketImpl(
         TCP_HOST: Optional[str] = "localhost",
         TCP_PORT: Optional[int] = 1000,
         TCP_BUFFER_SIZE: Optional[int] = 8192,
-        TCP_KEY: Optional[str] = None,
         TIMEOUT: Optional[int] = 5,
         MAX_FRAME_SIZE: Optional[int] = 125,
     ) -> None:
@@ -42,7 +41,6 @@ class ClientSocketImpl(
             TCP_HOST=TCP_HOST,
             TCP_PORT=TCP_PORT,
             TCP_BUFFER_SIZE=TCP_BUFFER_SIZE,
-            TCP_KEY=TCP_KEY,
             TIMEOUT=TIMEOUT,
             MAX_FRAME_SIZE=MAX_FRAME_SIZE,
         )
