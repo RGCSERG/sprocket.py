@@ -28,7 +28,7 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
         self,
         MAX_FRAME_SIZE: Optional[
             int
-        ] = 125,  # Defaults to 125 (maximum control frame size as stated in RFC6455)
+        ] = 125,  # Defaults to 125 (not a specific value, but an efficient default)
         IS_MASKED: Optional[bool] = True,  # Defaults to True (client).
     ) -> None:
         """
@@ -40,12 +40,12 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
             IS_MASKED boolean: determined by whether machine is client or remote host, resulting in true, false respectivly,
             (in accordance with RFC6455 5.1).
         """
-        self.MAX_FRAME_SIZE = MAX_FRAME_SIZE  # set MAX_FRAME_SIZE.
-        self.IS_MASKED = IS_MASKED  # set IS_MASKED.
+        self._MAX_FRAME_SIZE = MAX_FRAME_SIZE  # set _MAX_FRAME_SIZE.
+        self._IS_MASKED = IS_MASKED  # set _IS_MASKED.
 
-        self.mask_key_generator = (
+        self._MaskKeyGenerator = (
             MaskKey()
-        )  # Initialise an instance of the MaskKey under mask_key_generator (Composition).
+        )  # Initialise an instance of the MaskKey under _MaskKeyGenerator (Composition).
 
     def _generate_frame(
         self,
@@ -69,8 +69,8 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
 
         """
 
-        frame = bytearray()  # Initialises frame variable as a bytearray.
-        payload_length = len(
+        frame: bytearray = bytearray()  # Initialises frame variable as a bytearray.
+        payload_length: int = len(
             payload
         )  # Sets the length of the payload to be serialised.
 
@@ -81,12 +81,12 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
                 (fin << 0x7) | opcode
             )  # Append opcode and fin, with proper bit manipulation. (1)
             frame.append(
-                (self.IS_MASKED << 0x7) | payload_length
+                (self._IS_MASKED << 0x7) | payload_length
             )  # Append the masking flag and payload length, with proper bit manipulation. (2)
 
-            if self.IS_MASKED:
+            if self._IS_MASKED:
                 mask_key = (
-                    self.mask_key_generator.generate_masking_key()
+                    self._MaskKeyGenerator.generate_masking_key()
                 )  # If masked (client message), generate a masking key. (3)
                 frame.extend(
                     mask_key
@@ -109,14 +109,14 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
                 (fin << 0x7) | opcode
             )  # Append opcode and fin with proper bit manipulation. (1)
             frame.append(
-                (self.IS_MASKED << 0x7) | 0x7E
+                (self._IS_MASKED << 0x7) | 0x7E
             )  # Append the masking flag and payload length, with proper bit manipulation. (2)
             frame.extend(
                 payload_length.to_bytes(2, byteorder="big")
             )  # Append the masking flag and payload length, with proper bit manipulation. (2)
-            if self.IS_MASKED:
+            if self._IS_MASKED:
                 mask_key = (
-                    self.mask_key_generator.generate_masking_key()
+                    self._MaskKeyGenerator.generate_masking_key()
                 )  # If masked (client message), generate a masking key. (3)
                 frame.extend(
                     mask_key
@@ -138,14 +138,14 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
                 (fin << 0x7) | opcode
             )  # Append opcode and fin with proper bit manipulation. (1)
             frame.append(
-                (self.IS_MASKED << 0x7) | 0x7F
+                (self._IS_MASKED << 0x7) | 0x7F
             )  # Append the masking flag and payload length, with proper bit manipulation. (2)
             frame.extend(
                 payload_length.to_bytes(8, byteorder="big")
             )  # Append the masking flag and payload length, with proper bit manipulation. (2)
-            if self.IS_MASKED:
+            if self._IS_MASKED:
                 mask_key = (
-                    self.mask_key_generator.generate_masking_key()
+                    self._MaskKeyGenerator.generate_masking_key()
                 )  # If masked (client message), generate a masking key. (3)
                 frame.extend(
                     mask_key
@@ -176,7 +176,7 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
         """
         return (
             FrameOpcodes.continuation
-            if (i + self.MAX_FRAME_SIZE) < self.payload_length
+            if (i + self._MAX_FRAME_SIZE) < self.payload_length
             else FrameOpcodes.text
         )
 
@@ -200,7 +200,7 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
         self.payload_length = len(self.payload)  # Determine payload length.
         frames = []  # Initialises an empty list to store frames created.
 
-        if self.payload_length <= self.MAX_FRAME_SIZE:
+        if self.payload_length <= self._MAX_FRAME_SIZE:
             """
             If payload fits within the maximum frame size, create a single frame.
             Append the generated frame to the list.
@@ -213,9 +213,9 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
             If payload exceeds the maximum frame size, split it into multiple frames.
             Iterates over payload chunks and create frames accordingly, then append each frame to the list.
             """
-            for i in range(0, self.payload_length, self.MAX_FRAME_SIZE):
+            for i in range(0, self.payload_length, self._MAX_FRAME_SIZE):
                 frame_payload = self.payload[
-                    i : i + self.MAX_FRAME_SIZE
+                    i : i + self._MAX_FRAME_SIZE
                 ]  # Selects chunk to be serialised.
                 fin = self._is_last_created_frame(i)  # Asigns fin bit value.
                 opcode = self._is_last_created_frame(i)  # Asigns opcode bit value.
