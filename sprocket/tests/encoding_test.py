@@ -29,14 +29,14 @@ class TestWebSocketFrameEncoder(unittest.TestCase):
         self.encoder_unmasked = WebSocketFrameEncoder(IS_MASKED=False)
 
     def test_init_masked(self) -> None:
-        self.assertEqual(self.encoder_masked.MAX_FRAME_SIZE, 125)
-        self.assertEqual(self.encoder_masked.IS_MASKED, True)
-        self.assertIsNotNone(self.encoder_masked.mask_key_generator)
+        self.assertEqual(self.encoder_masked._MAX_FRAME_SIZE, 125)
+        self.assertEqual(self.encoder_masked._IS_MASKED, True)
+        self.assertIsNotNone(self.encoder_masked._MaskKeyGenerator)
 
     def test_init_unmasked(self) -> None:
-        self.assertEqual(self.encoder_unmasked.MAX_FRAME_SIZE, 125)
-        self.assertEqual(self.encoder_unmasked.IS_MASKED, False)
-        self.assertIsNotNone(self.encoder_unmasked.mask_key_generator)
+        self.assertEqual(self.encoder_unmasked._MAX_FRAME_SIZE, 125)
+        self.assertEqual(self.encoder_unmasked._IS_MASKED, False)
+        self.assertIsNotNone(self.encoder_unmasked._MaskKeyGenerator)
 
     def test_masked_encoding(self) -> None:
         hex_sequence = [
