@@ -31,11 +31,11 @@ All comments refering to binary operations will assume the structure of a btye t
 """
 
 
-__all__: Final[List[str]] = ["WebsocketFrameDecoder"]
+__all__: Final[List[str]] = ["WebSocketFrameDecoder"]
 
 
-class WebsocketFrameDecoder:  # inherit from descriptor class + comments
-    """Python class that represents a simple WebSocket frame.
+class WebSocketFrameDecoder:  # inherit from descriptor class + comments
+    """
     Provides methods for parsing WebSocket frame messages,
     extracting its components, and returning the payload data."""
 
@@ -58,7 +58,7 @@ class WebsocketFrameDecoder:  # inherit from descriptor class + comments
         self._opcode: int = 0  # Frame's Opcode.
         self._mask: int = 0  # Mask bit (1/0 for true/false respectively).
         self._payload_length: bytes = 0  # Payload length.
-        self._mask_key: bytearray = None  # Mask key (if masked), for decoding.
+        self._mask_key: bytearray = bytearray()  # Mask key (if masked), for decoding.
         self._payload_data: bytes = b""  # Actualy decoded payload (in bytes).
 
     @property
