@@ -19,7 +19,7 @@ SOFTWARE."""
 import base64, hashlib, random, select, socket, threading, time, re
 from typing import Any, Final, List, NoReturn, Optional
 from loguru import logger
-from ..frame_models import WebSocketFrameEncoder, WebsocketFrameDecoder, FrameOpcodes
+from ..frame_models import WebSocketFrameEncoder, WebSocketFrameDecoder, FrameOpcodes
 from ..sockets import ServerSocket
 
 __all__: Final[List[str]] = ["ServerSocketBaseImpl"]
@@ -69,7 +69,7 @@ class ServerSocketBaseImpl(
         self._rooms = {}
         self._input_sockets = []
         self._ws_sockets = []
-        self._frame_decoder = WebsocketFrameDecoder(status=False)
+        self._frame_decoder = WebSocketFrameDecoder(status=False)
         self._frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=False
         )

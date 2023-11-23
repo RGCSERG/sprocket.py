@@ -19,7 +19,7 @@ SOFTWARE."""
 import random, select, socket, threading, time, re
 from typing import Any, Final, List, Optional
 from loguru import logger
-from ..frame_models import WebSocketFrameEncoder, WebsocketFrameDecoder, FrameOpcodes
+from ..frame_models import WebSocketFrameEncoder, WebSocketFrameDecoder, FrameOpcodes
 from ..sockets import ClientSocket
 from ..functions import check_tcp_port, check_frame_size
 
@@ -60,7 +60,7 @@ class ClientSocketBaseImpl(
         # ---------------------- #
         self._LOCK = threading.Lock()
         self._socket_open = False
-        self._frame_decoder = WebsocketFrameDecoder(status=True)
+        self._frame_decoder = WebSocketFrameDecoder(status=True)
         self._frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True
         )
