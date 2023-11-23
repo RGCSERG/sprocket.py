@@ -28,3 +28,9 @@ class InvalidMaskException(Exception):
     Raised in the event that a client / remote-host recives,
     an incorrectly masked message
     """
+
+    def __init__(
+        self,
+        detail: str = "Client / remote-host  has recived an incorrectly masked message",
+    ) -> None:
+        super().__init__(detail)
