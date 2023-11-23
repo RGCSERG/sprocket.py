@@ -23,23 +23,8 @@ from typing import Final, List, Optional
 __all__: Final[List[str]] = ["MaskKey"]
 
 
-class MaskKey:  # comments + make inherit from descriptor class
-    @staticmethod
-    def mask_payload(payload: bytes, mask_key: bytearray, payload_length: int) -> bytes:
-        masked_payload: bytes = bytes(
-            payload[i] ^ mask_key[i % 4] for i in range(payload_length)
-        )
-
-        return masked_payload
-
-    @staticmethod
-    def unmask_payload(encoded_payload: bytearray, mask_key: bytearray) -> bytes:
-        unmasked_payload: list[int] = [
-            byte ^ mask_key[i % 4] for i, byte in enumerate(encoded_payload)
-        ]
-
-        payload_data = bytes(unmasked_payload)
-        return payload_data
+class MaskKey:
+    """Used for all Mask Key related opertaions"""
 
     @staticmethod
     def random(seed: int) -> int:
@@ -47,5 +32,67 @@ class MaskKey:  # comments + make inherit from descriptor class
         return (seed >> 24) & 0xFF
 
     def generate_masking_key(self, seed: Optional[int] = 1234) -> bytearray:
-        masking_key: bytearray = bytearray(self.random(seed=seed) for _ in range(4))
+        """
+        Generates masking key.
+
+        Args:
+            seed optional int: Seed to create masking key with.
+
+        Returns:
+            masking_key bytearray: Generated masking key.
+        """
+        masking_key: bytearray = bytearray(
+            self.random(seed=seed if seed else 1234) for _ in range(4)
+        )  # Generate masking key.
         return masking_key
+
+    @staticmethod
+    def mask_payload(payload: bytes, mask_key: bytearray, payload_length: int) -> bytes:
+        """
+        Takes in a payload and mask_key as arguments and masks the payload with respect to the mask_key.
+
+        Args:
+            payload bytes: Payload to be masked.
+            mask_key bytearray: Mask key to be used.
+
+        Returns:
+            masked_payload bytes: The resultant masked payload.
+        """
+
+        masked_payload: bytes = bytes(
+            payload[i]
+            ^ mask_key[
+                i % 4
+            ]  # Returns sequence of 0, 1, 2, 3 indefinitely, so that the length of the mask_key cannot be exceeded.
+            for i in range(
+                payload_length
+            )  # For every byte in the payload, mask it with the corresponding mask key index.
+        )
+
+        return masked_payload
+
+    @staticmethod
+    def unmask_payload(encoded_payload: bytearray, mask_key: bytearray) -> bytes:
+        """
+        Takes in a encoded_payload, and mask_key as arguments and unmasks the payload.
+
+        Args:
+            encoded_payload bytearray: Payload to be unmasked.
+            mask_key bytearray: Mask key to unmask the payload with.
+
+        Returns:
+            payload_data bytes: The unmasked payload data.
+        """
+
+        unmasked_payload: list[int] = [
+            byte
+            ^ mask_key[
+                i % 4
+            ]  # Returns sequence of 0, 1, 2, 3 indefinitely, so that the length of the mask_key cannot be exceeded.
+            for i, byte in enumerate(
+                encoded_payload
+            )  # For every byte in the payload, mask it with the corresponding mask key index.
+        ]
+
+        payload_data: bytes = bytes(unmasked_payload)  # Store unmaksed payload.
+        return payload_data
