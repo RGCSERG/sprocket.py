@@ -175,6 +175,19 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
             0x0 if a continuation frame, and 0x1 if final frame of message,
             (0x0 denoting continuation frame as stated in RFC6455 5.2).
         """
+        return 0x0 if (i + self._MAX_FRAME_SIZE) < self.payload_length else 0x1
+
+    def _is_last_created_frame_opcode(self, i: int) -> bytes:
+        """
+        Checks if the frame to be created is the final frame, and returns corresponding value.
+
+        Args:
+            i int: count which is being iterated over
+
+        Returns:
+            0x0 if a continuation frame, and 0x1 if final frame of message,
+            (0x0 denoting continuation frame as stated in RFC6455 5.2).
+        """
         return (
             FrameOpcodes.continuation
             if (i + self._MAX_FRAME_SIZE) < self.payload_length
@@ -197,9 +210,9 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
             list of created WebSocket Frame(s)
         """
 
-        self.payload = payload.encode("utf-8")  # Encode payload into UTF-8.
-        self.payload_length = len(self.payload)  # Determine payload length.
-        frames = []  # Initialises an empty list to store frames created.
+        self.payload: bytes = payload.encode("utf-8")  # Encode payload into UTF-8.
+        self.payload_length: int = len(self.payload)  # Determine payload length.
+        frames: list = []  # Initialises an empty list to store frames created.
 
         if (
             opcode > 0x7 and self.payload_length > self._MAX_FRAME_SIZE
@@ -224,7 +237,9 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
                     i : i + self._MAX_FRAME_SIZE
                 ]  # Selects chunk to be serialised.
                 fin = self._is_last_created_frame(i)  # Asigns fin bit value.
-                opcode = self._is_last_created_frame(i)  # Asigns opcode bit value.
+                opcode = self._is_last_created_frame_opcode(
+                    i
+                )  # Asigns opcode bit value.
                 frames.append(
                     self._generate_frame(frame_payload, opcode, fin)
                 )  # Creates frame and then appends it to the frames list.
