@@ -19,6 +19,7 @@ SOFTWARE."""
 from typing import Final, List, Optional  # Used for type annotations and decloration.
 from .maskkey import *  # Import used classes.
 from .frameopcodes import *  # Import used classes.
+from ..exceptions import EncodingException
 
 __all__: Final[List[str]] = ["WebSocketFrameEncoder"]
 
@@ -199,6 +200,11 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
         self.payload = payload.encode("utf-8")  # Encode payload into UTF-8.
         self.payload_length = len(self.payload)  # Determine payload length.
         frames = []  # Initialises an empty list to store frames created.
+
+        if (
+            opcode > 0x7 and self.payload_length > self._MAX_FRAME_SIZE
+        ):  # Raise encoding exception in the event that an control opcode is presented and that the payload exceeds frame limit.
+            raise EncodingException.control_exceeds_frame_size()
 
         if self.payload_length <= self._MAX_FRAME_SIZE:
             """
