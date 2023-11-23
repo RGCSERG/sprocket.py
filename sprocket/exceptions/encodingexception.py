@@ -16,5 +16,19 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-from .invalidmaskexception import *
-from .encodingexception import *
+
+from typing import Final, List
+
+
+__all__: Final[List[str]] = ["EncodingException"]
+
+
+class EncodingException(Exception):
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail)
+
+    @classmethod
+    def control_exceeds_frame_size(cls) -> Exception:
+        return cls(
+            detail="Frames with control opcodes must be contained in a singular frame."
+        )
