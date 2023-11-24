@@ -59,21 +59,21 @@ class ClientSocketBaseImpl(
             # value not set in this class
             pass
 
-        self._TCP_KEY = self._generate_random_websocket_key()
-        self._TCP_HOST = TCP_HOST
-        self._TCP_BUFFER_SIZE = TCP_BUFFER_SIZE
-        self._TIMEOUT = TIMEOUT
+        self._TCP_KEY = self._generate_random_websocket_key()  # Generate websocket key.
+        self._TCP_HOST = TCP_HOST  # Set _TCP_HOST.
+        self._TCP_BUFFER_SIZE = TCP_BUFFER_SIZE  # Set _TCP_BUFFER_SIZE.
+        self._TIMEOUT = TIMEOUT  # Set _TIMEOUT.
         # ---------------------- #
-        self._LOCK = threading.Lock()
-        self._socket_open = False
-        self._frame_decoder = WebSocketFrameDecoder(status=True)
+        self._LOCK = threading.Lock()  # Set _LOCK.
+        self._socket_open = False  # Set _socket_open.
+        self._frame_decoder = WebSocketFrameDecoder(status=True)  # Set _frame_decoder.
         self._frame_encoder = WebSocketFrameEncoder(
-            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True  # Set _frame_encoder.
         )
-        self._frame_types = FrameOpcodes()
-        self._event_handlers = {}
+        self._frame_types = FrameOpcodes()  # Set _frame_types.
+        self._event_handlers = {}  # Set _event_handlers.
 
-        self._setup_socket()
+        self._setup_socket()  # Setup socket.
 
     # Private methods
 
@@ -204,7 +204,8 @@ class ClientSocketBaseImpl(
         else:
             return False
 
-    def _generate_random_websocket_key(self) -> str:
+    @staticmethod
+    def _generate_random_websocket_key() -> str:
         # Generate a random WebSocket key
         characters = "0123456789ABCDEF"
         random_key = "".join(random.choice(characters) for _ in range(32))
