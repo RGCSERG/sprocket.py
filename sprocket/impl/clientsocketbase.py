@@ -39,16 +39,22 @@ class ClientSocketBaseImpl(
         MAX_FRAME_SIZE: Optional[int] = 125,
     ) -> None:
         # Constructor Method
-        if TCP_PORT is not None and not check_tcp_port(TCP_PORT=TCP_PORT):
-            raise ValueError("TCP_PORT must be in the range of 1-65535.")
+        if TCP_PORT is not None and not check_tcp_port(
+            TCP_PORT=TCP_PORT  # Checks if provided value is valid.
+        ):  # Checks if TCP_PORT is not none, if not then checks whether the provided value is valid.
+            raise ValueError(
+                "TCP_PORT must be in the range of 1-65535."
+            )  # If value provided is not valid, raise ValueError
         else:
-            # set _TCP_PORT to default value
+            # If no value provided, set _TCP_PORT to default value
             self._TCP_PORT = TCP_PORT
 
         if MAX_FRAME_SIZE is not None and not check_frame_size(
-            MAX_FRAME_SIZE=MAX_FRAME_SIZE
-        ):
-            raise ValueError("MAX_FRAME_SIZE must be greater than 112 bits (14 bytes).")
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE  # Checks whether provided value is valid.
+        ):  # Checks if MAX_FRAME_SIZE is not none, if not then checks whether the provided value is valid.
+            raise ValueError(
+                "MAX_FRAME_SIZE must be greater than 112 bits (14 bytes)."
+            )  # If value provided is not valid raise ValueError.
         else:
             # value not set in this class
             pass
