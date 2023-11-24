@@ -26,4 +26,4 @@ def check_frame_size(MAX_FRAME_SIZE: int) -> bool:
     """Checks if frame size is a viable number."""
 
     # value has to be greater than minimum frame size (112) but smaller than 0x8000000000000000 (2**63)
-    return 0x8000000000000000 < MAX_FRAME_SIZE > 0x70
+    return 0x8000000000000000 > MAX_FRAME_SIZE > 0x70
