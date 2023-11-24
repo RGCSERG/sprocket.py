@@ -207,7 +207,7 @@ class WebSocketFrameDecoder:  # inherit from descriptor class + comments
 
     @staticmethod
     def _parse_payload_length(
-        data_in_bytes: bytearray,
+        frame_in_bytes: bytearray,
     ) -> tuple[int, Literal[10, 4, 2]]:
         """
         Static method used to retrieve (parse) the payload length from any given frame.
@@ -215,7 +215,7 @@ class WebSocketFrameDecoder:  # inherit from descriptor class + comments
         This method is static as it does not rely of the instance of the class.
 
         Args:
-            data_in_bytes bytearray: Whole frame in the form of an bytearray.
+            frame_in_bytes bytearray: Whole frame in the form of an bytearray.
 
         Returns:
             tuple[
@@ -225,7 +225,7 @@ class WebSocketFrameDecoder:  # inherit from descriptor class + comments
         """
 
         payload_length = (
-            data_in_bytes[
+            frame_in_bytes[
                 1
             ]  # Perform AND operator (&) with operand 0x7F (binary: 01111111, denary: 127) on the second byte,
             & 0x7F  # This isolates the payload length from the mask bit, by enforcing a failed operation for the 8th bit.
@@ -236,29 +236,29 @@ class WebSocketFrameDecoder:  # inherit from descriptor class + comments
             payload_length == 0x7E
         ):  # If payload length is equal to 0x7E (126), then the payload length is stored as a 16 bit unsigned integer, over the next two bytes (bytes 3 and 4).
             payload_length = int.from_bytes(
-                data_in_bytes[2:4], byteorder="big"
+                frame_in_bytes[2:4], byteorder="big"
             )  # Retrieve payload from bytes 3 and 4.
             start_mask_key = 4  # Move the start of the masking key back 2 bytes (byte 5), to account for the extended payload length.
         if (
             payload_length == 0x7F
         ):  # If payload length is equal to 0x7F (127), then the paylood length is stored as a 64 bit unsigned integer, over the next 8 bytes (bytes 3-10).
             payload_length = int.from_bytes(
-                data_in_bytes[2:10], byteorder="big"
+                frame_in_bytes[2:10], byteorder="big"
             )  # Retrieve payload from bytes 3-10.
             start_mask_key = 10  # Move the start of the masking key back 8 bytes (byte 11), to account for the extended payload length.
 
         return payload_length, start_mask_key
 
-    def _parse_websocket_frame_header(self, data_in_bytes: bytearray) -> None:
+    def _parse_websocket_frame_header(self, frame_in_bytes: bytearray) -> None:
         """
         Instance Method to parse all parts of the websocket frame which are follow the same process, for each instance.
 
         Args:
-            data_in_bytes bytearray: Whole frame in the form of an bytearray.
+            frame_in_bytes bytearray: Whole frame in the form of an bytearray.
         """
 
-        first_byte = data_in_bytes[0]  # Set first_byte.
-        second_byte = data_in_bytes[1]  # Set second_byte.
+        first_byte = frame_in_bytes[0]  # Set first_byte.
+        second_byte = frame_in_bytes[1]  # Set second_byte.
 
         self._fin = self._parse_fin_bit(first_byte=first_byte)  # Parse fin bit.
         self._rsv1 = self._parse_rsv1_bit(first_byte=first_byte)  # Parse rsv1 bit.
@@ -267,39 +267,39 @@ class WebSocketFrameDecoder:  # inherit from descriptor class + comments
         self._opcode = self._parse_opcode(first_byte=first_byte)  # Parse opcode.
         self._mask = self._parse_mask(second_byte=second_byte)  # Parse mask bit.
         self._payload_length, self._start_mask_key = self._parse_payload_length(
-            data_in_bytes=data_in_bytes
+            frame_in_bytes=frame_in_bytes
         )  # Parse payload length and set start of mask key.
 
-    def _may_parse_masking_key(self, data_in_bytes: bytearray) -> None:
+    def _may_parse_masking_key(self, frame_in_bytes: bytearray) -> None:
         """
         Parses masking key, using the value for the start of the masking key, determined when parsing the payload length.
         """
 
         if self._mask:  # If the frame's mask bit is True.
-            self._mask_key = data_in_bytes[
+            self._mask_key = frame_in_bytes[
                 self._start_mask_key : self._start_mask_key
                 + 4  # Masking key is 4 bytes long, so add four to mark the end of the masking key.
             ]  # Retrieve masking key.
 
-    def _parse_payload(self, data_in_bytes: bytearray) -> None:
+    def _parse_payload(self, frame_in_bytes: bytearray) -> None:
         """
         Parses the payload, using values determined in previously called functions.
 
         Args:
-            data_in_bytes bytearray: Whole frame in the form of an bytearray.
+            frame_in_bytes bytearray: Whole frame in the form of an bytearray.
         """
 
         payload_data = b""  # Initialise payload_data as a empty bytes.
         if (
             self._payload_length
         ):  # For efficiancy, this checks weather there is anything to retrieve.
-            payload_start = (
+            start_payload = (
                 self._start_mask_key + 4
                 if self._mask
                 else self._start_mask_key  # Checks if the message is masked, setting payload start accordingly.
             )
-            encoded_payload = data_in_bytes[
-                payload_start : payload_start + self._payload_length
+            encoded_payload = frame_in_bytes[
+                start_payload : start_payload + self._payload_length
             ]  # Retrieves payload.
 
             if self._mask:  # If the payload is masked, it must be decoded.
@@ -329,20 +329,20 @@ class WebSocketFrameDecoder:  # inherit from descriptor class + comments
             return True
         return False
 
-    def decode_websocket_message(self, data_in_bytes: bytes) -> None:
+    def decode_websocket_message(self, frame_in_bytes: bytes) -> None:
         """
         Populates the frame instance with data,
         parsed using class methods.
         """
         self._parse_websocket_frame_header(
-            data_in_bytes=data_in_bytes
+            frame_in_bytes=frame_in_bytes
         )  # Parses header data.
         if (
             not self._may_fail()
         ):  # For efficiancy reasons, the class will not process the rest of the data if an error has occured.
             self._may_parse_masking_key(
-                data_in_bytes=data_in_bytes
+                frame_in_bytes=frame_in_bytes
             )  # MAY parse masking key (if messages is masked).
-            self._parse_payload(data_in_bytes=data_in_bytes)  # Parses payload.
+            self._parse_payload(frame_in_bytes=frame_in_bytes)  # Parses payload.
         else:
             raise InvalidMaskException  # If an error has occured raise InvalidMaskException.
