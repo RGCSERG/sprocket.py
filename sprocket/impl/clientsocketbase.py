@@ -79,29 +79,37 @@ class ClientSocketBaseImpl(
 
     def _check_control_frame(self, opcode: bytes, client_socket: socket) -> None:
         # Handle control frames
-        if opcode == self._frame_types.close:
-            self._close_socket(client_socket=client_socket)
+        if (
+            opcode == self._frame_types.close
+        ):  # Check if recieved frame opcode is a connection close opcode.
+            self._close_socket(
+                client_socket=client_socket
+            )  # Close the socket connection.
             return
-        if opcode == self._frame_types.ping:
+        if (
+            opcode == self._frame_types.ping
+        ):  # Check if recieved frame opcode is a ping opcode.
             logger.debug(f"Received Ping from {client_socket}")
-            self._pong(client_socket=client_socket)
+            self._pong(client_socket=client_socket)  # Send a pong frame in response.
             return
-        if opcode == self._frame_types.pong:
-            logger.success(f"Received Pong from {client_socket}")
+        if (
+            opcode == self._frame_types.pong
+        ):  # Check if recieved frame opcode is a pong opcode.
+            logger.success(f"Received Pong from {client_socket}")  #
             return
 
     def _pong(self, client_socket: socket) -> None:
         # Send Pong response
         self.send_websocket_message(
             client_socket=client_socket, opcode=self._frame_types.pong
-        )
+        )  # Send a pong frame using send_websocket_message method.
 
     def _handle_websocket_message(self, client_socket: socket) -> None:
         # Handle incoming WebSocket messages
-        data_in_bytes = b""
-        final_message = ""
+        frame_in_bytes = b""  # Initialise frame_in_bytes.
+        final_message = ""  # Initialise final_message.
 
-        while True:
+        while True:  # While data is being sent.
             frame_data = self._read_recv(client_socket=client_socket)
             if not frame_data:
                 # Connection closed, or no data received.
@@ -109,18 +117,18 @@ class ClientSocketBaseImpl(
 
             logger.debug("Handling WebSocket message")
 
-            data_in_bytes = frame_data
-            if not self._is_final_frame(data_in_bytes):
+            frame_in_bytes = frame_data
+            if not self._is_final_frame(frame_in_bytes):
                 # This is a fragmented frame
                 self._frame_decoder.decode_websocket_message(
-                    data_in_bytes=data_in_bytes
+                    frame_in_bytes=frame_in_bytes
                 )
                 message_payload = self._frame_decoder.payload_data.decode("utf-8")
                 final_message += message_payload
             else:
                 # This is a non-fragmented frame
                 self._frame_decoder.decode_websocket_message(
-                    data_in_bytes=data_in_bytes
+                    frame_in_bytes=frame_in_bytes
                 )
                 control_opcode = self._frame_decoder.opcode
                 self._check_control_frame(
@@ -130,8 +138,8 @@ class ClientSocketBaseImpl(
                 final_message += message_payload
                 break
 
-        if final_message and data_in_bytes:
-            data_in_bytes = b""
+        if final_message and frame_in_bytes:
+            frame_in_bytes = b""
             self._trigger_message_event(final_message, client_socket)
 
     def _trigger_message_event(self, message: str, client_socket: socket) -> None:
@@ -146,9 +154,9 @@ class ClientSocketBaseImpl(
         else:
             logger.debug(f"Received message: {message} , at  no endpoint")
 
-    def _is_final_frame(self, data_in_bytes: bytes) -> bool:
+    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
         # Check the FIN bit in the first byte of the frame.
-        return (data_in_bytes[0] & 0b10000000) >> 7 == 1
+        return (frame_in_bytes[0] & 0b10000000) >> 7 == 1
 
     def _close_socket(self, client_socket: socket) -> None:
         # Close the socket
