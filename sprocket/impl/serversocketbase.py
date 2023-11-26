@@ -158,12 +158,12 @@ class ServerSocketBaseImpl(
         message = ""
         # Very naive approach: read until we find the last blank line
         while True:
-            data_in_bytes = self._read_recv(client_socket=client_socket)
+            frame_in_bytes = self._read_recv(client_socket=client_socket)
             # Connnection on client side has closed.
-            if len(data_in_bytes) == 0:
+            if len(frame_in_bytes) == 0:
                 self._close_socket(client_socket)
                 return
-            message_segment = data_in_bytes.decode()
+            message_segment = frame_in_bytes.decode()
             message += message_segment
             if len(message) > 4 and message_segment[-4:] == "\r\n\r\n":
                 break
@@ -294,7 +294,7 @@ class ServerSocketBaseImpl(
                 handler(*args, **kwargs)
 
     def _handle_websocket_message(self, client_socket: socket) -> None:
-        data_in_bytes = b""
+        frame_in_bytes = b""
         final_message = ""
 
         while True:
@@ -305,18 +305,18 @@ class ServerSocketBaseImpl(
 
             logger.debug("Handling websocket message")
 
-            data_in_bytes = frame_data
-            if not self._is_final_frame(data_in_bytes):
+            frame_in_bytes = frame_data
+            if not self._is_final_frame(frame_in_bytes):
                 # This is a fragmented frame
                 self._frame_decoder.decode_websocket_message(
-                    data_in_bytes=data_in_bytes
+                    frame_in_bytes=frame_in_bytes
                 )
                 message_payload = self._frame_decoder.payload_data.decode("utf-8")
                 final_message += message_payload
             else:
                 # This is a non-fragmented frame
                 self._frame_decoder.decode_websocket_message(
-                    data_in_bytes=data_in_bytes
+                    frame_in_bytes=frame_in_bytes
                 )
                 control_opcode = self._frame_decoder.opcode
                 self._check_control_frame(
@@ -326,8 +326,8 @@ class ServerSocketBaseImpl(
                 final_message += message_payload
                 break
 
-        if final_message and data_in_bytes:
-            data_in_bytes = b""
+        if final_message and frame_in_bytes:
+            frame_in_bytes = b""
             self._trigger_message_event(final_message, client_socket)
 
     def _trigger_message_event(self, message: str, client_socket: socket) -> None:
@@ -342,9 +342,9 @@ class ServerSocketBaseImpl(
         else:
             logger.debug(f"Received message: {message} , at  no endpoint")
 
-    def _is_final_frame(self, data_in_bytes: bytes) -> bool:
+    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
         # Check the FIN bit in the first byte of the frame.
-        return (data_in_bytes[0] & 0b10000000) >> 7 == 1
+        return (frame_in_bytes[0] & 0b10000000) >> 7 == 1
 
     def _read_recv(self, client_socket: socket) -> None:
         # Read data from the socket
