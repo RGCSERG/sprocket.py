@@ -17,9 +17,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 
-from typing import Final, List, Literal, Optional
-from .maskkey import *
-from ..exceptions import *
+from typing import (
+    Final,
+    List,
+    Literal,
+    Optional,
+)  # Used for type annotations and decloration.
+from .maskkey import *  # Import used classes.
+from ..exceptions import *  # Import used exceptions.
 
 
 """
@@ -298,17 +303,17 @@ class WebSocketFrameDecoder:  # inherit from descriptor class + comments
                 if self._mask
                 else self._start_mask_key  # Checks if the message is masked, setting payload start accordingly.
             )
-            encoded_payload = frame_in_bytes[
+            masked_payload = frame_in_bytes[
                 start_payload : start_payload + self._payload_length
             ]  # Retrieves payload.
 
             if self._mask:  # If the payload is masked, it must be decoded.
                 payload_data = MaskKey.unmask_payload(
-                    encoded_payload=encoded_payload,
+                    masked_payload=masked_payload,
                     mask_key=self._mask_key,
                 )  # Decode payload (abstracted by other class).
             else:  # If payload is not masked, it doesn't need to be decoded.
-                payload_data = encoded_payload
+                payload_data = masked_payload
 
         self._payload_data = payload_data
 
