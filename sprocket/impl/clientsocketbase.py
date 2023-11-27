@@ -16,12 +16,22 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import random, select, socket, threading, time, re
-from typing import Any, Final, List, Optional
-from loguru import logger
-from ..frame_models import WebSocketFrameEncoder, WebSocketFrameDecoder, FrameOpcodes
-from ..sockets import ClientSocket
-from ..functions import check_tcp_port, check_frame_size
+import random, select, socket, threading, time, re  # Import used libaries.
+from typing import (
+    Any,
+    Final,
+    List,
+    Optional,
+)  # Used for type annotations and decloration.
+from loguru import logger  # Used for console logging.
+from ..frame_models import (
+    WebSocketFrameEncoder,
+    WebSocketFrameDecoder,
+    FrameOpcodes,
+)  # Import used classes.
+from ..sockets import ClientSocket  # Import Abstract model.
+from ..functions import check_tcp_port, check_frame_size  # Import used functions.
+from ..exceptions import TCPPortException, FrameSizeException  # Import used exceptions.
 
 
 __all__: Final[List[str]] = ["ClientSocketBaseImpl"]
@@ -42,9 +52,7 @@ class ClientSocketBaseImpl(
         if TCP_PORT is not None and not check_tcp_port(
             TCP_PORT=TCP_PORT  # Checks if provided value is valid.
         ):  # Checks if TCP_PORT is not none, if not then checks whether the provided value is valid.
-            raise ValueError(
-                "TCP_PORT must be in the range of 1-65535."
-            )  # If value provided is not valid, raise ValueError
+            raise TCPPortException  # If value provided is not valid, raise ValueError
         else:
             # If no value provided, set _TCP_PORT to default value
             self._TCP_PORT = TCP_PORT
@@ -52,9 +60,7 @@ class ClientSocketBaseImpl(
         if MAX_FRAME_SIZE is not None and not check_frame_size(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE  # Checks whether provided value is valid.
         ):  # Checks if MAX_FRAME_SIZE is not none, if not then checks whether the provided value is valid.
-            raise ValueError(
-                "MAX_FRAME_SIZE must be greater than 112 bits (14 bytes)."
-            )  # If value provided is not valid raise ValueError.
+            raise FrameSizeException  # If value provided is not valid raise ValueError.
         else:
             # value not set in this class
             pass
