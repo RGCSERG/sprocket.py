@@ -19,7 +19,8 @@ SOFTWARE."""
 from typing import Final, List, Optional  # Used for type annotations and decloration.
 from .maskkey import *  # Import used classes.
 from .frameopcodes import *  # Import used classes.
-from ..exceptions import EncodingException
+from ..exceptions import EncodingException  # Import used exceptions.
+from ..functions import check_if_control  # Import used functions.
 
 __all__: Final[List[str]] = ["WebSocketFrameEncoder"]
 
@@ -215,11 +216,13 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
         frames: list = []  # Initialises an empty list to store frames created.
 
         if (
-            opcode > 0x7 and self.payload_length > self._MAX_FRAME_SIZE
+            check_if_control(opcode=opcode) and self.payload_length > 0x7D  # 125 bits.
         ):  # Raise encoding exception in the event that an control opcode is presented and that the payload exceeds frame limit.
             raise EncodingException.control_exceeds_frame_size()
 
-        if self.payload_length <= self._MAX_FRAME_SIZE:
+        if (self.payload_length <= self._MAX_FRAME_SIZE) or check_if_control(
+            opcode=opcode
+        ):  # Ensures control frames where valid are not fragmented.
             """
             If payload fits within the maximum frame size, create a single frame.
             Append the generated frame to the list.
