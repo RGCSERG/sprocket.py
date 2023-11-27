@@ -16,19 +16,31 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import base64, hashlib, random, select, socket, threading, time, re
-from typing import Any, Final, List, NoReturn, Optional
-from loguru import logger
-from ..frame_models import WebSocketFrameEncoder, WebSocketFrameDecoder, FrameOpcodes
-from ..sockets import ServerSocket
+import base64, hashlib, random, select, socket, threading, time, re  # Import used libaries.
+from typing import (
+    Any,
+    Final,
+    List,
+    NoReturn,
+    Optional,
+)  # Used for type annotations and decloration.
+from loguru import logger  # Used for console logging.
+from ..frame_models import (
+    WebSocketFrameEncoder,
+    WebSocketFrameDecoder,
+    FrameOpcodes,
+)  # Import used classes.
+from ..sockets import ServerSocket  # Import Abstract model.
+from ..functions import check_tcp_port, check_frame_size  # Import used functions.
+from ..exceptions import TCPPortException, FrameSizeException  # Import used exceptions.
 
 __all__: Final[List[str]] = ["ServerSocketBaseImpl"]
 
 DEFAULT_HTTP_RESPONSE = b"""<HTML><HEAD><meta http-equiv="content-type"
 content="text/html;charset=utf-8">\r\n
-<TITLE>200 OK</TITLE></HEAD><BODY>\r\n
-<H1>200 OK</H1>\r\n
-default response\r\n
+<TITLE>Default Response</TITLE></HEAD><BODY>\r\n
+<H1>Default Response</H1>\r\n
+<p>Default Response</p>\r\n
 </BODY></HTML>\r\n\r\n"""
 
 
@@ -44,37 +56,51 @@ class ServerSocketBaseImpl(
         MAX_FRAME_SIZE: Optional[int] = 125,
         TIMEOUT: Optional[int] = 5,
         DEFAULT_HTTP_RESPONSE: Optional[bytes] = DEFAULT_HTTP_RESPONSE,
-        WEBSOCKET_GUID: Optional[str] = None,
         BACKLOG: Optional[int] = 5,
     ) -> None:
-        if TCP_PORT is not None and not (1 <= TCP_PORT <= 65535):
-            raise ValueError("TCP_PORT must be in the range of 1-65535.")
-        if WEBSOCKET_GUID is not None:
-            # set _WEBSOCKET_GUID to value user input
-            self._WEBSOCKET_GUID = WEBSOCKET_GUID
+        # Constructor Method
+        if TCP_PORT is not None and not check_tcp_port(
+            TCP_PORT=TCP_PORT  # Checks if provided value is valid.
+        ):  # Checks if TCP_PORT is not none, if not then checks whether the provided value is valid.
+            raise TCPPortException  # If value provided is not valid, raise ValueError
         else:
-            # Generate a random WebSocket GUID for each instance
-            self._WEBSOCKET_GUID = self._generate_random_websocket_guid()
+            # If no value provided, set _TCP_PORT to default value
+            self._TCP_PORT = TCP_PORT
 
-        self._TCP_HOST = TCP_HOST
-        self._TCP_PORT = TCP_PORT
-        self._TCP_BUFFER_SIZE = TCP_BUFFER_SIZE
-        self._WS_ENDPOINT = WS_ENDPOINT
-        self._TIMEOUT = TIMEOUT
-        self._DEFAULT_HTTP_RESPONSE = DEFAULT_HTTP_RESPONSE
-        self._BACKLOG = BACKLOG
-        self._LOCK = threading.Lock()
+        if MAX_FRAME_SIZE is not None and not check_frame_size(
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE  # Checks whether provided value is valid.
+        ):  # Checks if MAX_FRAME_SIZE is not none, if not then checks whether the provided value is valid.
+            raise FrameSizeException  # If value provided is not valid raise ValueError.
+        else:
+            # value not set in this class
+            pass
+
+        self._TCP_HOST: str = TCP_HOST  # Server Host domain.
+        self._TCP_PORT: int = TCP_PORT  # Host domain port.
+        self._TCP_BUFFER_SIZE: int = TCP_BUFFER_SIZE  # Set buffer size (in bits).
+        self._WS_ENDPOINT: str = WS_ENDPOINT  # WebSocket connection route.
+        self._TIMEOUT: int = TIMEOUT  # Set select socket timeout.
+        self._DEFAULT_HTTP_RESPONSE: bytes = (
+            DEFAULT_HTTP_RESPONSE  # Set default HTTP response.
+        )
+        self._BACKLOG: int = BACKLOG  # Set server backlog.
+        self._WEBSOCKET_GUID: str = (
+            self._generate_random_websocket_guid()
+        )  # Generate a random WebSocket GUID for each instance.
+        self._LOCK = threading.Lock()  # Protect access to shared resources.
         # ---------------------- #
-        self._event_handlers = {}
-        self._rooms = {}
-        self._input_sockets = []
-        self._ws_sockets = []
-        self._frame_decoder = WebSocketFrameDecoder(status=False)
+        self._event_handlers: dict = {}  # Initialise _event_handlers.
+        self._rooms: dict = {}  # Initialise _rooms.
+        self._input_sockets: list = []  # Initialise _input sockets.
+        self._ws_sockets: list = []  # Initialise websocket sockets.
+        self._frame_decoder = WebSocketFrameDecoder(
+            status=False
+        )  # Initialise _frame_decoder.
         self._frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=False
-        )
+        )  # Initialise _frame_encoder.
 
-        self._setup_socket()
+        self._setup_socket()  # Setup socket.
 
     # Private methods
 
@@ -85,7 +111,8 @@ class ServerSocketBaseImpl(
 
         self._input_sockets.append(self._server_socket)
 
-    def _generate_random_websocket_guid(self) -> str:
+    @staticmethod
+    def _generate_random_websocket_guid() -> str:
         # Characters that can be used in the GUID
         characters = "0123456789ABCDEF"
 
