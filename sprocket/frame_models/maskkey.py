@@ -72,12 +72,12 @@ class MaskKey:
         return masked_payload
 
     @staticmethod
-    def unmask_payload(encoded_payload: bytearray, mask_key: bytearray) -> bytes:
+    def unmask_payload(masked_payload: bytearray, mask_key: bytearray) -> bytes:
         """
-        Takes in a encoded_payload, and mask_key as arguments and unmasks the payload.
+        Takes in a masked_payload, and mask_key as arguments and unmasks the payload.
 
         Args:
-            encoded_payload bytearray: Payload to be unmasked.
+            masked_payload bytearray: Payload to be unmasked.
             mask_key bytearray: Mask key to unmask the payload with.
 
         Returns:
@@ -90,7 +90,7 @@ class MaskKey:
                 i % 4
             ]  # Returns sequence of 0, 1, 2, 3 indefinitely, so that the length of the mask_key cannot be exceeded.
             for i, byte in enumerate(
-                encoded_payload
+                masked_payload
             )  # For every byte in the payload, mask it with the corresponding mask key index.
         ]
 
