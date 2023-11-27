@@ -1,3 +1,23 @@
+"""
+Python libary for WebSocket applications.
+"""
+
+from datetime import datetime
+
+from .exceptions import *
+from .frame_models import *
+from .functions import *
+from .impl import *
+from .sockets import *
+
+__version__ = "0.0.0"
+__author__ = "RGCSERG"
+__copyright__ = f"Copyright (c) {datetime.now().strftime('%Y')} RGCSERG"
+__email__ = ""
+__description__ = "Websocket Server Libary"
+__license__ = "MIT"
+__github__ = "https://github.com/RGCSERG/sprocket.py"
+
 """Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -15,20 +35,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
-
-
-from datetime import datetime
-
-from .exceptions import *
-from .frame_models import *
-from .functions import *
-from .impl import *
-from .sockets import *
-
-__version__ = "0.0.0"
-__author__ = "RGCSERG"
-__copyright__ = f"Copyright (c) {datetime.now().strftime('%Y')} RGCSERG"
-__email__ = ""
-__description__ = "Websocket Server Libary"
-__license__ = "MIT"
-__github__ = "https://github.com/RGCSERG/sprocket.py"
