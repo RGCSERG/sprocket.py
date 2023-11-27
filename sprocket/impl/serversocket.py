@@ -41,10 +41,9 @@ class ServerSocketImpl(
         TCP_BUFFER_SIZE: Optional[int] = 8192,
         WS_ENDPOINT: Optional[str] = "/websocket",
         MAX_FRAME_SIZE: Optional[int] = 125,
-        DEFAULT_HTTP_RESPONSE: Optional[bytes] = DEFAULT_HTTP_RESPONSE,
-        WEBSOCKET_GUID: Optional[str] = None,
-        BACKLOG: Optional[int] = 5,
         TIMEOUT: Optional[int] = 5,
+        DEFAULT_HTTP_RESPONSE: Optional[bytes] = DEFAULT_HTTP_RESPONSE,
+        BACKLOG: Optional[int] = 5,
     ) -> None:
         super().__init__(
             TCP_HOST=TCP_HOST,
@@ -54,7 +53,6 @@ class ServerSocketImpl(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE,
             TIMEOUT=TIMEOUT,
             DEFAULT_HTTP_RESPONSE=DEFAULT_HTTP_RESPONSE,
-            WEBSOCKET_GUID=WEBSOCKET_GUID,
             BACKLOG=BACKLOG,
         )
 
