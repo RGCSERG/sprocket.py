@@ -105,22 +105,31 @@ class ServerSocketBaseImpl(
     # Private methods
 
     def _setup_socket(self) -> None:
-        self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._server_socket.bind((self._TCP_HOST, self._TCP_PORT))
+        self._server_socket = socket.socket(  # Using the socket libary.
+            socket.AF_INET,  # Using the AF_INET address family.
+            socket.SOCK_STREAM,  # Using sock stream type SOCK_STREAM- socket for TCP communication.
+        )  # Initialise the socket.
+        self._server_socket.setsockopt(
+            socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
+        )  #  Enable reusing the address and port.
+        self._server_socket.bind(
+            (self._TCP_HOST, self._TCP_PORT)
+        )  # Bind the socket to specified host and port.
 
-        self._input_sockets.append(self._server_socket)
+        self._input_sockets.append(
+            self._server_socket
+        )  # Append socket to _input_sockets.
 
     @staticmethod
     def _generate_random_websocket_guid() -> str:
         # Characters that can be used in the GUID
-        characters = "0123456789ABCDEF"
+        characters: str = "0123456789ABCDEF"
 
         # Generate a random 32-character string
-        random_guid = "".join(random.choice(characters) for _ in range(32))
+        random_guid : str= "".join(random.choice(characters) for _ in range(32))
 
         # Format it as a WebSocket GUID
-        formatted_guid = "-".join(
+        formatted_guid : str= "-".join(
             [
                 random_guid[:8],
                 random_guid[8:12],
