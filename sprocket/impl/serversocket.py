@@ -21,13 +21,6 @@ from typing import Any, Callable, Final, List, Optional
 from loguru import logger
 from .serversocketbase import *
 
-DEFAULT_HTTP_RESPONSE = b"""<HTML><HEAD><meta http-equiv="content-type"
-content="text/html;charset=utf-8">\r\n
-<TITLE>200 OK</TITLE></HEAD><BODY>\r\n
-<H1>200 OK</H1>\r\n
-Welcome to the default.\r\n
-</BODY></HTML>\r\n\r\n"""
-
 __all__: Final[List[str]] = ["ServerSocketImpl"]
 
 
@@ -42,7 +35,6 @@ class ServerSocketImpl(
         WS_ENDPOINT: Optional[str] = "/websocket",
         MAX_FRAME_SIZE: Optional[int] = 125,
         TIMEOUT: Optional[int] = 5,
-        DEFAULT_HTTP_RESPONSE: Optional[bytes] = DEFAULT_HTTP_RESPONSE,
         BACKLOG: Optional[int] = 5,
     ) -> None:
         super().__init__(
@@ -52,7 +44,6 @@ class ServerSocketImpl(
             WS_ENDPOINT=WS_ENDPOINT,
             MAX_FRAME_SIZE=MAX_FRAME_SIZE,
             TIMEOUT=TIMEOUT,
-            DEFAULT_HTTP_RESPONSE=DEFAULT_HTTP_RESPONSE,
             BACKLOG=BACKLOG,
         )
 
@@ -141,65 +132,83 @@ class ServerSocketImpl(
             self._event_handlers[event] = []
         self._event_handlers[event].append(handler)
 
-    def join_room(self, room_name: str, client_socket: socket) -> None:
-        """
-        Add a client to a specific chat room.
-        This method adds a client (identified by their socket) to a specified chat room.
+    # def join_room(self, room_name: str, client_socket: socket) -> None:
+    #     """
+    #     Add a client to a specific chat room.
+    #     This method adds a client (identified by their socket) to a specified chat room.
 
-        Args:
-            client_socket socket: The client socket to be added to the chat room.
-            room_name str: The name of the chat room to join.
-        """
-        if room_name not in self._rooms:
-            self._rooms[room_name] = []
-        self._rooms[room_name].append(client_socket)
+    #     Args:
+    #         client_socket socket: The client socket to be added to the chat room.
+    #         room_name str: The name of the chat room to join.
+    #     """
+    #     if room_name not in self._rooms:
+    #         self._rooms[room_name] = []
+    #     self._rooms[room_name].append(client_socket)
 
-    def leave_room(self, client_socket: socket, room_name: Optional[str] = "") -> None:
-        """
-        Remove a client from a specific chat room.
-        This method removes a client (identified by their socket) from a specified chat room.
+    # def to(self, room_name: str):
+    #     if room_name not in self._rooms:
+    #         self._rooms[room_name] = []
 
-        Args:
-            client_socket socket: The client socket to be removed from the chat room.
-            room_name str: The name of the chat room to leave.
-        """
-        if room_name != "":
-            if room_name in self._rooms and client_socket in self._rooms[room_name]:
-                self._rooms[room_name].remove(client_socket)
-        else:
-            for room_name in self._rooms:
-                if client_socket in self._rooms[room_name]:
-                    self._rooms[room_name].remove(client_socket)
+    #     return RoomEmitter(self, self._rooms[room_name])
 
-    def broadcast_to_room(
-        self,
-        room_name: str,
-        message: str,
-        client_socket: Optional[Any] = None,
-        event: Optional[str] = "",
+    # def leave_room(self, client_socket: socket, room_name: Optional[str] = "") -> None:
+    #     """
+    #     Remove a client from a specific chat room.
+    #     This method removes a client (identified by their socket) from a specified chat room.
+
+    #     Args:
+    #         client_socket socket: The client socket to be removed from the chat room.
+    #         room_name str: The name of the chat room to leave.
+    #     """
+    #     if room_name != "":
+    #         if room_name in self._rooms and client_socket in self._rooms[room_name]:
+    #             self._rooms[room_name].remove(client_socket)
+    #     else:
+    #         for room_name in self._rooms:
+    #             if client_socket in self._rooms[room_name]:
+    #                 self._rooms[room_name].remove(client_socket)
+
+    # def broadcast_to_room(
+    #     self,
+    #     room_name: str,
+    #     message: str,
+    #     client_socket: Optional[Any] = None,
+    #     event: Optional[str] = "",
+    # ) -> None:
+    #     """
+    #     Broadcast a message to all clients in a specific chat room.
+    #     This method sends a message to all clients who are part of a specific chat room.
+
+    #     Args:
+    #         client_socket socket: The client socket which sent the message
+    #         message str: The message to broadcast to clients in the chat room.
+    #     """
+
+    #     if self._rooms[room_name] and client_socket in self._rooms[room_name]:
+    #         for socket in self._rooms[room_name]:
+    #             if client_socket != socket:
+    #                 self.send_websocket_message(
+    #                     message=message, client_socket=socket, event=event
+    #                 )
+
+    def _emit(
+        self, event: str, payload: (str | bytes | dict | None), socket: socket
     ) -> None:
-        """
-        Broadcast a message to all clients in a specific chat room.
-        This method sends a message to all clients who are part of a specific chat room.
+        json_data: dict = {event: payload}
 
-        Args:
-            client_socket socket: The client socket which sent the message
-            message str: The message to broadcast to clients in the chat room.
-        """
-
-        if self._rooms[room_name] and client_socket in self._rooms[room_name]:
-            for socket in self._rooms[room_name]:
-                if client_socket != socket:
-                    self.send_websocket_message(
-                        message=message, client_socket=socket, event=event
-                    )
-
-    def emit(self, event: str, payload: (str | bytes | dict | None)) -> None:
-        json_data: dict = {f"{event}", payload}
-
-        payload: bytes = json.dumps(json_data)
+        payload: str = json.dumps(json_data)
 
         frames = self._frame_encoder.encode_payload_to_frames(payload=payload)
 
         for frame in frames:
-            socket.send(frame)
+            self.send(frame)
+
+
+class RoomEmitter:
+    def __init__(self, server_socket: ServerSocketImpl, room: list) -> None:
+        self._server_socket = server_socket
+        self._room: list = room
+
+    def emit(self, event: str, payload: (str | bytes | dict | None)) -> None:
+        for socket in self._room:
+            self._server_socket._emit(event=event, payload=payload, socket=socket)
