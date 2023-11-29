@@ -16,7 +16,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import socket, threading
+import socket, threading, json
 from typing import Any, Callable, Final, List, Optional
 from loguru import logger
 from .serversocketbase import *
@@ -93,9 +93,8 @@ class ServerSocketImpl(
 
     def send_websocket_message(
         self,
-        client_socket: socket,
-        message: Optional[str] = "",
-        event: Optional[str] = "",
+        socket: socket,
+        payload: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
     ) -> None:
         """
@@ -103,25 +102,19 @@ class ServerSocketImpl(
         This method sends a WebSocket message to a specific client identified by the provided socket.
 
         Args:
-            client_socket socket: The client socket to send the message to.
+            socket socket: The client socket to send the message to.
             message Optional[str]: The message to send to the client.
             event Optional[str]: An optional event identifier for the message.
             opcode Optional[bytes]: The WebSocket frame opcode.
         """
         logger.debug("Sending Message")
 
-        if event != "":
-            full_message = f"{event}:{message}"
-            frames = self._frame_encoder.encode_payload_to_frames(
-                payload=full_message, opcode=opcode
-            )
-        else:
-            frames = self._frame_encoder.encode_payload_to_frames(
-                payload=message, opcode=opcode
-            )
+        frames = self._frame_encoder.encode_payload_to_frames(
+            payload=payload, opcode=opcode
+        )
 
         for frame in frames:
-            client_socket.send(frame)
+            socket.send(frame)
 
     def ping(self, client_socket: socket) -> None:
         """
@@ -200,3 +193,13 @@ class ServerSocketImpl(
                     self.send_websocket_message(
                         message=message, client_socket=socket, event=event
                     )
+
+    def emit(self, event: str, payload: (str | bytes | dict | None)) -> None:
+        json_data: dict = {f"{event}", payload}
+
+        payload: bytes = json.dumps(json_data)
+
+        frames = self._frame_encoder.encode_payload_to_frames(payload=payload)
+
+        for frame in frames:
+            socket.send(frame)
