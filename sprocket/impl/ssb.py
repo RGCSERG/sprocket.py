@@ -21,6 +21,7 @@ from typing import (
     Any,
     Final,
     List,
+    Literal,
     NoReturn,
     Optional,
 )  # Used for type annotations and decloration.
@@ -38,13 +39,6 @@ from .requesthandler import *
 
 __all__: Final[List[str]] = ["ServerSocketBaseImpl"]
 
-DEFAULT_HTTP_RESPONSE = b"""<HTML><HEAD><meta http-equiv="content-type"
-content="text/html;charset=utf-8">\r\n
-<TITLE>Default Response</TITLE></HEAD><BODY>\r\n
-<H1>Default Response</H1>\r\n
-<p>Default Response</p>\r\n
-</BODY></HTML>\r\n\r\n"""
-
 
 class ServerSocketBaseImpl:
     def __init__(
@@ -55,7 +49,6 @@ class ServerSocketBaseImpl:
         WS_ENDPOINT: Optional[str] = "/websocket",
         MAX_FRAME_SIZE: Optional[int] = 125,
         TIMEOUT: Optional[int] = 5,
-        DEFAULT_HTTP_RESPONSE: Optional[bytes] = DEFAULT_HTTP_RESPONSE,
         BACKLOG: Optional[int] = 5,
     ) -> None:
         if PORT is not None and not check_tcp_port(
@@ -79,9 +72,6 @@ class ServerSocketBaseImpl:
         self._BUFFER_SIZE: int = BUFFER_SIZE  # Set buffer size (in bits).
         self._WS_ENDPOINT: str = WS_ENDPOINT  # WebSocket connection route.
         self._TIMEOUT: int = TIMEOUT  # Set select socket timeout.
-        self._DEFAULT_HTTP_RESPONSE: bytes = (
-            DEFAULT_HTTP_RESPONSE  # Set default HTTP response.
-        )
         self._BACKLOG: int = BACKLOG  # Set server backlog.
         self._WEBSOCKET_GUID: str = (
             self._generate_random_websocket_guid()
@@ -92,7 +82,9 @@ class ServerSocketBaseImpl:
         self._rooms: dict = {}  # Initialise _rooms.
         self._active_sockets: list = []  # Initialise _active_sockets.
         self._ws_sockets: list = []  # Initialise websocket sockets.
-        self._request_handler: HTTPRequestHandler = HTTPRequestHandler()
+        self._request_handler: HTTPRequestHandler = HTTPRequestHandler(
+            WS_ENDPOINT=WS_ENDPOINT
+        )
         self._frame_decoder: WebSocketFrameDecoder = WebSocketFrameDecoder(
             status=False
         )  # Initialise _frame_decoder.
@@ -123,30 +115,26 @@ class ServerSocketBaseImpl:
 
         return formatted_guid
 
-
     def _remove_socket_from_lists(self, socket: socket) -> None:
         if socket in self._ws_sockets:
             self._ws_sockets.remove(socket)
         if socket in self._active_sockets:
             self._active_sockets.remove(socket)
 
-    
     def _close_socket(self, socket: socket) -> None:
         with self._LOCK:
             logger.warning("closing socket")
-            
+
             self._remove_socket_from_lists(socket=socket)
 
-            self.send_websocket_message(
-                client_socket=socket, opcode=FrameOpcodes.close
-            )
+            self.send_websocket_message(client_socket=socket, opcode=FrameOpcodes.close)
             self.leave_room(client_socket=socket)
 
             socket.close()
             return
 
     def _setup_socket(self) -> None:
-        self._server_socket : socket= socket.socket(  # Using the socket libary.
+        self._server_socket: socket = socket.socket(  # Using the socket libary.
             socket.AF_INET,  # Using the AF_INET address family.
             socket.SOCK_STREAM,  # Using sock stream type SOCK_STREAM- socket for TCP communication.
         )  # Initialise the socket.
@@ -160,47 +148,141 @@ class ServerSocketBaseImpl:
         self._input_sockets.append(
             self._server_socket
         )  # Append socket to _input_sockets.
-    
 
+    def _generate_sec_websocket_accept(self, sec_websocket_key: str) -> bytes:
+        # Concatenate the provided key with the WebSocket GUID
+        concatenated_key: str = sec_websocket_key + self._WEBSOCKET_GUID
 
-    def _receive_http_request(self, socket:socket) ->  str:
-        request_data:bytes = b"" # Initialise request data.
+        # Generate SHA1 hash of the concatenated string
+        sha1_hash: bytes = hashlib.sha1(concatenated_key.encode()).digest()
+
+        # Encode the hash in base64
+        encoded_key: bytes = base64.b64encode(sha1_hash)
+
+        return encoded_key
+
+    def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
+        # Trigger event handlers
+        if event in self._event_handlers:
+            for handler in self._event_handlers[event]:
+                handler(*args, **kwargs)
+
+    def _trigger_message_event(self, message: str, socket: socket) -> None:
+        event_separator_index = message.find(":")
+        if event_separator_index != -1:
+            event_name = message[:event_separator_index]
+            message = message[event_separator_index + 1 :]
+            event_name = re.sub(r"^.*?(\w+)$", r"\1", event_name)
+            message = re.sub(r"^.*?(\w+)$", r"\1", message)
+            logger.debug(f"Received message: {message} , at endpoint {event_name}")
+            self._trigger(message, event=event_name, client_socket=socket)
+        else:
+            logger.debug(f"Received message: {message} , at  no endpoint")
+
+    def _handle_ws_handshake_request(self, socket: socket, headers: dict) -> None:
+        self._ws_sockets.append(socket)
+
+        sec_websocket_key = headers.get("sec-websocket-key")
+
+        sec_websocket_accept_value = self._generate_sec_websocket_accept(
+            sec_websocket_key=sec_websocket_key
+        )
+
+        response = (
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Accept: {sec_websocket_accept_value.decode()}\r\n"
+            "\r\n"
+        )
+
+        socket.send(response.encode("utf-8"))
+
+        self._trigger(event="connection", client_socket=socket)
+
+    def _receive_http_request(self, socket: socket) -> str:
+        request_data: bytes = b""  # Initialise request data.
 
         while True:
             http_chunk = socket.recv(self._BUFFER_SIZE)
 
             if not http_chunk:
-                break # Break the loop when no more data is received.
+                break  # Break the loop when no more data is received.
 
             request_data += http_chunk
 
             if b"\r\n\r\n" in request_data:
                 break  # Exit the loop when the entire request is received.
-        
+
         decoded_request_data: str = request_data.decode("utf-8")
         return decoded_request_data
-    
+
     def _handle_request(self, socket: socket) -> None:
         logger.debug("Handling HTTP request from: ", socket.fileno())
-        request_data : str= self._receive_http_request(socket=socket)
+        request_data: str = self._receive_http_request(socket=socket)
 
         if not request_data:
             self._close_socket(socket=socket)
             return
 
-        response = self._request_handler.process_request(request_data=request_data)
-        
-        if response:
-            socket.send(response.encode("utf-8"))
+        response, status = self._request_handler.process_request(
+            request_data=request_data
+        )
+
+        if not status:
+            socket.send(response.encode("utf-8")) if response else None
             self._close_socket(socket=socket)
-        
+            return
+
+        self._handle_ws_handshake_request(socket=socket, headers=response)
         self._close_socket(socket=socket)
 
+    def _pong(self, socket: socket) -> None:
+        self.send_websocket_message(socket=socket, opcode=FrameOpcodes.pong)
 
+    def _check_control_frame(self, opcode: bytes, socket: socket) -> None:
+        if opcode == FrameOpcodes.close:
+            self._close_socket(socket=socket)
+            return
+        if opcode == FrameOpcodes.ping:
+            logger.debug(f"Recived Ping from {socket}")
+            self._pong(socket=socket)
+            return
+        if opcode == FrameOpcodes.pong:
+            logger.debug(f"Recived Pong from {socket}")
+            return
+
+    def _read_recv(self, socket: socket) -> Any | None:
+        # Read data from the socket
+        readable_sockets: list = select.select([socket], [], [], self._TIMEOUT)[0]
+
+        if socket not in readable_sockets:
+            return None
+
+        with self._LOCK:
+            retry_count: int = 0
+            MAX_RETRIES: Literal[5] = 5
+
+            while retry_count < MAX_RETRIES and socket in readable_sockets:
+                data = socket.recv(self._BUFFER_SIZE)
+                if data:
+                    return data
+                else:
+                    retry_count += 1
+                    delay: int = 2**retry_count
+                    logger.warning(f"No data received, retrying in {delay} seconds...")
+                    time.sleep(delay)
+
+            logger.critical("Max retries reached. Unable to read data.")
+            return None
+
+    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
+        # Check the FIN bit in the first byte of the frame.
+        return (frame_in_bytes[0] & 0x80) >> 7 == 1
 
     def _handle_websocket_message(self, socket: socket) -> None:
-        frame_in_bytes = b""
-        final_message = ""
+        frame_in_bytes: bytes = b""
+        final_message: str = ""
 
         while True:
             frame_data = self._read_recv(client_socket=socket)
@@ -224,30 +306,42 @@ class ServerSocketBaseImpl:
                     frame_in_bytes=frame_in_bytes
                 )
                 control_opcode = self._frame_decoder.opcode
-                self._check_control_frame(
-                    opcode=control_opcode, client_socket=socket
-                )
+                self._check_control_frame(opcode=control_opcode, client_socket=socket)
                 message_payload = self._frame_decoder.payload_data.decode("utf-8")
                 final_message += message_payload
                 break
 
         if final_message and frame_in_bytes:
             frame_in_bytes = b""
-            self._trigger_message_event(final_message, client_socket)
+            self._trigger_message_event(final_message, socket)
 
     def _create_new_client_thread(self, client_socket: socket) -> None:
         try:
-            readable_sockets = select.select(
-                self._active_sockets, self._ws_sockets, [], self._TIMEOUT)[0]
-            
+            readable_sockets: list = select.select(
+                self._active_sockets, self._ws_sockets, [], self._TIMEOUT
+            )[0]
+
             while client_socket in readable_sockets:
                 if client_socket.fileno() == -1:
                     self._remove_socket_from_lists(socket=client_socket)
                 if client_socket in self._ws_sockets:
                     self._handle_websocket_message(socket=client_socket)
-                
-                self._handle_request(socket==client_socket)
-    
+
+                self._handle_request(socket=client_socket)
+
+        except ConnectionResetError:
+            critical = True
+
+        if not critical:
+            logger.warning(f"Closed socket: {client_socket}")
+            return
+
+        self._remove_socket_from_lists(socket=client_socket)
+        self.leave_room(client_socket=client_socket)
+
+        logger.critical(f"Socket Forcibly closed {client_socket}")
+
+        return
 
     def _handle_new_connection(self) -> None:
         client_socket, client_address = self._server_socket.accept()
@@ -259,13 +353,16 @@ class ServerSocketBaseImpl:
         )
         self._active_sockets.append(client_socket)
 
-        client_listening_thread = threading.Thread(target=self._create_new_client_thread, args=[client_socket])
+        client_listening_thread = threading.Thread(
+            target=self._create_new_client_thread, args=[client_socket]
+        )
         client_listening_thread.start()
 
+        return
 
     def _listen_for_messages(self) -> None:
         while True:
-            readable_sockets = select.select(
+            readable_sockets: list = select.select(
                 self._active_sockets, [], [], self._TIMEOUT
             )[0]
 
