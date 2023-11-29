@@ -16,13 +16,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import base64, hashlib, random, select, socket, threading, time, re  # Import used libaries.
+import base64, hashlib, random, select, socket, threading, time, re
+import json  # Import used libaries.
 from typing import (
     Any,
+    Callable,
     Final,
     List,
     Literal,
-    NoReturn,
+    Dict,
     Optional,
 )  # Used for type annotations and decloration.
 from loguru import logger  # Used for console logging.
@@ -78,10 +80,12 @@ class ServerSocketBaseImpl:
         )  # Generate a random WebSocket GUID for each instance.
         self._LOCK = threading.Lock()  # Protect access to shared resources.
         # ---------------------- #
-        self._event_handlers: dict = {}  # Initialise _event_handlers.
-        self._rooms: dict = {}  # Initialise _rooms.
+        self._rooms: Dict[str, list] = {}  # Initialise _rooms.
+        self._event_handlers: Dict[
+            str, List[Callable]
+        ] = {}  # Initialise _event_handlers.
         self._active_sockets: list = []  # Initialise _active_sockets.
-        self._ws_sockets: list = []  # Initialise websocket sockets.
+        self._websocket_sockets: list = []  # Initialise websocket sockets.
         self._request_handler: HTTPRequestHandler = HTTPRequestHandler(
             WS_ENDPOINT=WS_ENDPOINT
         )
@@ -116,8 +120,8 @@ class ServerSocketBaseImpl:
         return formatted_guid
 
     def _remove_socket_from_lists(self, socket: socket) -> None:
-        if socket in self._ws_sockets:
-            self._ws_sockets.remove(socket)
+        if socket in self._websocket_sockets:
+            self._websocket_sockets.remove(socket)
         if socket in self._active_sockets:
             self._active_sockets.remove(socket)
 
@@ -149,7 +153,7 @@ class ServerSocketBaseImpl:
             self._server_socket
         )  # Append socket to _input_sockets.
 
-    def _generate_sec_websocket_accept(self, sec_websocket_key: str) -> bytes:
+    def _create_sec_accept_key(self, sec_websocket_key: str) -> bytes:
         # Concatenate the provided key with the WebSocket GUID
         concatenated_key: str = sec_websocket_key + self._WEBSOCKET_GUID
 
@@ -167,44 +171,81 @@ class ServerSocketBaseImpl:
             for handler in self._event_handlers[event]:
                 handler(*args, **kwargs)
 
-    def _trigger_message_event(self, message: str, socket: socket) -> None:
-        event_separator_index = message.find(":")
-        if event_separator_index != -1:
-            event_name = message[:event_separator_index]
-            message = message[event_separator_index + 1 :]
-            event_name = re.sub(r"^.*?(\w+)$", r"\1", event_name)
-            message = re.sub(r"^.*?(\w+)$", r"\1", message)
-            logger.debug(f"Received message: {message} , at endpoint {event_name}")
-            self._trigger(message, event=event_name, client_socket=socket)
-        else:
-            logger.debug(f"Received message: {message} , at  no endpoint")
+    def _trigger_event_from_message(self, final_message: dict, socket: socket) -> None:
+        final_message_keys = list(final_message.keys())
 
-    def _handle_ws_handshake_request(self, socket: socket, headers: dict) -> None:
-        self._ws_sockets.append(socket)
+        event = final_message_keys[0]
+
+        if not event:
+            logger.warning(f'Message with no endpoint recieved: {final_message[""]}')
+            return
+
+        self._trigger(final_message, event=event)
+
+        return
+
+    def _emit(
+        self, event: str, payload: (str | bytes | dict | None), socket: socket
+    ) -> None:
+        json_data: dict = {event: payload}
+
+        payload: str = json.dumps(json_data)
+
+        frames = self._frame_encoder.encode_payload_to_frames(payload=payload)
+
+        for frame in frames:
+            socket.send(frame)
+
+    def _handle_handshake(self, socket: socket, headers: dict) -> None:
+        self._websocket_sockets.append(socket)
 
         sec_websocket_key = headers.get("sec-websocket-key")
 
-        sec_websocket_accept_value = self._generate_sec_websocket_accept(
+        sec_accept = self._create_sec_accept_key(
             sec_websocket_key=sec_websocket_key
-        )
+        ).decode()
 
         response = (
             "HTTP/1.1 101 Switching Protocols\r\n"
             "Upgrade: websocket\r\n"
             "Connection: Upgrade\r\n"
-            f"Sec-WebSocket-Accept: {sec_websocket_accept_value.decode()}\r\n"
+            f"Sec-WebSocket-Accept: {sec_accept}\r\n"
             "\r\n"
-        )
+        ).encode("utf-8")
 
-        socket.send(response.encode("utf-8"))
+        socket.send(response)
 
         self._trigger(event="connection", client_socket=socket)
+
+    def _read_recv(self, socket: socket) -> Any | None:
+        # Read data from the socket
+        readable_sockets: list = select.select([socket], [], [], self._TIMEOUT)[0]
+
+        if socket not in readable_sockets:
+            return None
+
+        with self._LOCK:
+            retry_count: int = 0
+            MAX_RETRIES: Literal[5] = 5
+
+            while retry_count < MAX_RETRIES and socket in readable_sockets:
+                data = socket.recv(self._BUFFER_SIZE)
+                if data:
+                    return data
+                else:
+                    retry_count += 1
+                    delay: int = (0.1 * retry_count) ** 2
+                    logger.warning(f"No data received, retrying in {delay} seconds...")
+                    time.sleep(delay)
+
+            logger.critical("Max retries reached. Unable to read data.")
+            return None
 
     def _receive_http_request(self, socket: socket) -> str:
         request_data: bytes = b""  # Initialise request data.
 
         while True:
-            http_chunk = socket.recv(self._BUFFER_SIZE)
+            http_chunk = self._read_recv(socket=socket)
 
             if not http_chunk:
                 break  # Break the loop when no more data is received.
@@ -218,7 +259,7 @@ class ServerSocketBaseImpl:
         return decoded_request_data
 
     def _handle_request(self, socket: socket) -> None:
-        logger.debug("Handling HTTP request from: ", socket.fileno())
+        logger.debug("Handling HTTP request")
         request_data: str = self._receive_http_request(socket=socket)
 
         if not request_data:
@@ -251,30 +292,6 @@ class ServerSocketBaseImpl:
         if opcode == FrameOpcodes.pong:
             logger.debug(f"Recived Pong from {socket}")
             return
-
-    def _read_recv(self, socket: socket) -> Any | None:
-        # Read data from the socket
-        readable_sockets: list = select.select([socket], [], [], self._TIMEOUT)[0]
-
-        if socket not in readable_sockets:
-            return None
-
-        with self._LOCK:
-            retry_count: int = 0
-            MAX_RETRIES: Literal[5] = 5
-
-            while retry_count < MAX_RETRIES and socket in readable_sockets:
-                data = socket.recv(self._BUFFER_SIZE)
-                if data:
-                    return data
-                else:
-                    retry_count += 1
-                    delay: int = 2**retry_count
-                    logger.warning(f"No data received, retrying in {delay} seconds...")
-                    time.sleep(delay)
-
-            logger.critical("Max retries reached. Unable to read data.")
-            return None
 
     def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
         # Check the FIN bit in the first byte of the frame.
@@ -313,18 +330,20 @@ class ServerSocketBaseImpl:
 
         if final_message and frame_in_bytes:
             frame_in_bytes = b""
-            self._trigger_message_event(final_message, socket)
+            message_dict: dict = json.loads(final_message)
+
+            self._trigger_event_from_message(final_message=message_dict, socket=socket)
 
     def _create_new_client_thread(self, client_socket: socket) -> None:
         try:
             readable_sockets: list = select.select(
-                self._active_sockets, self._ws_sockets, [], self._TIMEOUT
+                self._active_sockets, self._websocket_sockets, [], self._TIMEOUT
             )[0]
 
             while client_socket in readable_sockets:
                 if client_socket.fileno() == -1:
                     self._remove_socket_from_lists(socket=client_socket)
-                if client_socket in self._ws_sockets:
+                if client_socket in self._websocket_sockets:
                     self._handle_websocket_message(socket=client_socket)
 
                 self._handle_request(socket=client_socket)
@@ -343,18 +362,19 @@ class ServerSocketBaseImpl:
 
         return
 
-    def _handle_new_connection(self) -> None:
-        client_socket, client_address = self._server_socket.accept()
+    def _handle_connection(self) -> None:
+        new_socket, socket_address = self._server_socket.accept()
+        self._active_sockets.append(new_socket)
+
         logger.success(
-            "Handled new connection",
-            client_socket.fileno(),
+            "New WebSocket connection: ",
+            new_socket.fileno(),
             " from address: ",
-            client_address,
+            socket_address,
         )
-        self._active_sockets.append(client_socket)
 
         client_listening_thread = threading.Thread(
-            target=self._create_new_client_thread, args=[client_socket]
+            target=self._create_new_client_thread, args=[socket_address]
         )
         client_listening_thread.start()
 
@@ -371,4 +391,4 @@ class ServerSocketBaseImpl:
                     self._remove_socket_from_lists(socket=socket)
                 if socket == self._server_socket:
                     logger.success("Handling incoming HTTP message.")
-                    self._handle_new_connection()
+                    self._handle_connection()
