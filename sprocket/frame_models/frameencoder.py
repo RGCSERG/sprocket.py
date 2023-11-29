@@ -178,7 +178,7 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
         """
         return 0x0 if (i + self._MAX_FRAME_SIZE) < self.payload_length else 0x1
 
-    def _is_last_created_frame_opcode(self, i: int) -> bytes:
+    def _is_last_created_frame_opcode(self, i: int, original_opcode: bytes) -> bytes:
         """
         Checks if the frame to be created is the final frame, and returns corresponding value.
 
@@ -192,7 +192,7 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
         return (
             FrameOpcodes.continuation
             if (i + self._MAX_FRAME_SIZE) < self.payload_length
-            else FrameOpcodes.text
+            else original_opcode
         )
 
     def encode_payload_to_frames(
@@ -239,9 +239,9 @@ class WebSocketFrameEncoder:  # make inherit from descriptor class + tests + rew
                 frame_payload = self.payload[
                     i : i + self._MAX_FRAME_SIZE
                 ]  # Selects chunk to be serialised.
-                fin = self._is_last_created_frame(i)  # Asigns fin bit value.
+                fin = self._is_last_created_frame(i=i)  # Asigns fin bit value.
                 opcode = self._is_last_created_frame_opcode(
-                    i
+                    i=i, original_opcode=opcode
                 )  # Asigns opcode bit value.
                 frames.append(
                     self._generate_frame(frame_payload, opcode, fin)
