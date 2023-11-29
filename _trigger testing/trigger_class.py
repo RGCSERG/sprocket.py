@@ -13,7 +13,7 @@ from typing import (
 __all__: Final[List[str]] = ["TriggerTesting"]
 
 
-class TriggerTesting:
+class EventTrigger:
     def __init__(self) -> None:
         self._rooms: Dict[str, list] = {}
         self._event_handlers: Dict[str, List[Callable]] = {}
@@ -39,7 +39,7 @@ class TriggerTesting:
 
         return RoomEmitter(self, self._rooms[room_name])
 
-    def emit(
+    def _emit(
         self, event: str, payload: (str | bytes | dict | None), socket: socket
     ) -> None:
         json_data: dict = {event: payload}
@@ -53,7 +53,7 @@ class TriggerTesting:
 
 
 class RoomEmitter:
-    def __init__(self, trigger_testing: TriggerTesting, room: list) -> None:
+    def __init__(self, trigger_testing: EventTrigger, room: list) -> None:
         self._trigger_testing = trigger_testing
         self._room: list = room
 
@@ -62,7 +62,7 @@ class RoomEmitter:
             self._trigger_testing.emit(event=event, payload=payload, socket=socket)
 
 
-trigger = TriggerTesting()
+trigger = EventTrigger()
 
 
 def main(socket):
