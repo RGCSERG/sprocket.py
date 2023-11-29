@@ -46,19 +46,16 @@ class HTTPRequestHandler:
         method, target, http_version = request_line.split(" ")
         return method, target, http_version
 
-    def _parse_headers(self, header_lines: list[str]) -> dict:
-        headers: dict = {}
-        for line in header_lines:
-            if ":" in line:
-                header_name, header_value = line.split(":", 1)
-                header_name = header_name.strip()
-                header_value = header_value.strip()
-                headers[
-                    header_name.lower()  # Headers should be set to lower case, for all mapping and classification rules.
-                ] = header_value
+    def _parse_headers(self, headers: list[str]) -> dict:
+        headers: dict = {
+            header_name.lower(): header_value.strip()  # Headers should be set to lower case, for all mapping and classification rules.
+            for line in headers
+            if ":" in line
+            for header_name, header_value in (line.split(":", 1),)
+        }
         return headers
 
-    def _is_valid_ws_handshake_request(
+    def _validate_handshake(
         self, method: str, target: str, headers: dict, http_version: str
     ) -> bool:
         logger.debug("Handling WebSocket handshake request.")
@@ -87,16 +84,18 @@ class HTTPRequestHandler:
 
     def _parse_request(self, request_data: str) -> tuple[str, str, dict, str]:
         # Split the request data into lines to parse individual components
-        request_lines: list[str] = request_data.split("\r\n")
+        request_list: list[str] = request_data.split("\r\n")
 
-        if not request_lines:
+        if not request_list:
             return None
 
         # Parse the request line to extract method, target, and HTTP version
-        method, target, http_version = self._parse_request_line(request_lines[0])
+        method, target, http_version = self._parse_request_line(
+            request_line=request_list[0]
+        )
 
         # Parse headers
-        headers: dict = self._parse_headers(request_lines[1:])
+        headers: dict = self._parse_headers(headers=request_list[1:])
 
         return method, target, headers, http_version
 
@@ -122,7 +121,7 @@ class HTTPRequestHandler:
         if not request:
             return full_response, False
 
-        if not self._is_valid_ws_handshake_request(
+        if not self._validate_handshake(
             method=method, target=target, headers=headers, http_version=http_version
         ):
             logger.warning("Handshake invalid.")
