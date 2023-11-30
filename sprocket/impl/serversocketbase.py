@@ -153,11 +153,10 @@ class ServerSocketBaseImpl:
         with self._LOCK:
             logger.warning("closing socket")
 
-            
+            self._remove_socket_from_lists(socket=socket)
 
             self._send_websocket_message(socket=socket, opcode=FrameOpcodes.close)
             self.leave_room(socket=socket)
-            self._remove_socket_from_lists(socket=socket)
 
             socket.close()
             return
@@ -410,7 +409,6 @@ class ServerSocketBaseImpl:
         while True:
             if not self.main_thread:
                 break
-
             readable_sockets: list = select.select(
                 self._active_sockets, [], [], self._TIMEOUT
             )[0]
