@@ -16,8 +16,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import socket, threading, json
-from typing import Callable, Final, List, Optional
+import socket, threading
+from typing import Callable, Final, List, Optional, Type
 from loguru import logger
 from .serversocketbase import *
 
@@ -121,11 +121,24 @@ class ServerSocketImpl(
             self._rooms[room_name] = []
         self._rooms[room_name].append(socket)
 
-    def to(self, room_name: str):
-        if room_name not in self._rooms:
-            self._rooms[room_name] = []
+    def to(
+        self, room_name: str
+    ) -> Type["RoomEmitter"]:  # Type is used here to avoid undefined errors.
+        """
+        Emits a message to a specific room, with use of the RoomEmitter class defined below.
 
-        return RoomEmitter(self, self._rooms[room_name])
+        Args:
+            room_name str: The specific room to be emitted to.
+
+        Returns:
+            RoomEmitter: Returns an instance of the room emitter class.
+        """
+        if room_name not in self._rooms:  # Implement some error handling logic.
+            self._rooms[room_name] = []  # Not a viable solution.
+
+        room_users: list = self._rooms[room_name]
+
+        return RoomEmitter(server_socket=self, room_users=room_users)
 
     def leave_room(self, socket: socket, room_name: Optional[str] = "") -> None:
         """
@@ -174,10 +187,34 @@ class ServerSocketImpl(
 
 
 class RoomEmitter:
-    def __init__(self, server_socket: ServerSocketImpl, room: list) -> None:
-        self._server_socket = server_socket
-        self._room: list = room
+    """
+    Allows for messages to be emitted to a particular room,
+    not just all or one client.
+    """
+
+    def __init__(self, server_socket: ServerSocketImpl, room_users: list) -> None:
+        """
+        Initialiser method
+
+        Args:
+            server_socket ServerSocketImpl: The current instance of the server.
+            room list: The list of sockets in the specified room.
+        """
+        self._server_socket = server_socket  # Initialise instance of the server.
+        self._room_users: list = room_users  # Initialise room's socket list.
 
     def emit(self, event: str, payload: (str | bytes | dict | None)) -> None:
-        for socket in self._room:
-            self._server_socket._emit(event=event, payload=payload, socket=socket)
+        """
+        Method used for emitting message to specific room, with use of the private _emit message,
+        with respect to the current instance of the ServerSocketImpl instance.
+
+        Args:
+            event str: The event to be trigger by the sent message.
+            payload (str | bytes | dict | None): The payload to be sent with the WebSocket message,
+            the specific type of the payload doesn't matter (too much) as will be automatically converted
+            to str by the _emit function.
+        """
+        for socket in self._room_users:  # Iterates through each socket in the room.
+            self._server_socket._emit(
+                event=event, payload=payload, socket=socket
+            )  # For each socket in the room, a message is directly sent.
