@@ -1,2 +1,2 @@
 # sprocket.py
-python library for websocket applications
+Python library for websocket applications.
