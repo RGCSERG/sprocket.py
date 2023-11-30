@@ -16,7 +16,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import random, threading
+
+import random, threading, json
 from typing import Callable, Final, List, Optional
 from loguru import logger
 
@@ -30,16 +31,16 @@ class ClientSocketImpl(
 ):  # rework with new frame encoder and websocketframe class updates + comments
     def __init__(
         self,
-        TCP_HOST: Optional[str] = "localhost",
-        TCP_PORT: Optional[int] = 1000,
-        TCP_BUFFER_SIZE: Optional[int] = 8192,
+        HOST: Optional[str] = "localhost",
+        PORT: Optional[int] = 1000,
+        BUFFER_SIZE: Optional[int] = 8192,
         TIMEOUT: Optional[int] = 5,
         MAX_FRAME_SIZE: Optional[int] = 125,
     ) -> None:
         super().__init__(
-            TCP_HOST=TCP_HOST,
-            TCP_PORT=TCP_PORT,
-            TCP_BUFFER_SIZE=TCP_BUFFER_SIZE,
+            HOST=HOST,
+            PORT=PORT,
+            BUFFER_SIZE=BUFFER_SIZE,
             TIMEOUT=TIMEOUT,
             MAX_FRAME_SIZE=MAX_FRAME_SIZE,
         )
@@ -52,9 +53,9 @@ class ClientSocketImpl(
         This method performs the WebSocket handshake and starts listening for messages.
         """
         try:
-            self._client_socket.connect((self._TCP_HOST, self._TCP_PORT))
+            self._client_socket.connect((self._HOST, self._PORT))
 
-            logger.debug(f"Connected to {self._TCP_HOST}:{self._TCP_PORT}")
+            logger.debug(f"Connected to {self._HOST}:{self._PORT}")
 
             if self._perform_websocket_handshake():
                 logger.success("WebSocket handshake successful")
@@ -68,43 +69,13 @@ class ClientSocketImpl(
         except ConnectionRefusedError:
             logger.warning("Connection to server actively refused")
 
-    def send_websocket_message(
-        self,
-        message: Optional[str] = "",
-        event: Optional[str] = "",
-        opcode: Optional[bytes] = 0x1,
-    ) -> None:
-        """
-        Send a WebSocket message to the server.
-
-        Args:
-            message Optional[str]: The message to send.
-            event Optional[str]: The event name associated with the message.
-            opcode Optional[bytes]: The opcode indicating the type of message.
-        """
-        if self._socket_open:
-            logger.debug("Sending Message")
-
-            if event != "":
-                full_message = f"{event}:{message}"
-                frames = self._frame_encoder.encode_payload_to_frames(
-                    payload=full_message, opcode=opcode
-                )
-            else:
-                frames = self._frame_encoder.encode_payload_to_frames(
-                    payload=message, opcode=opcode
-                )
-
-            for frame in frames:
-                self._client_socket.send(frame)
-
     def close(self) -> None:
         """
         Close the WebSocket connection by sending a close frame to the server.
         """
         logger.warning("Sending Close Frame")
         if self._socket_open:
-            self.send_websocket_message(opcode=self._frame_types.close)
+            self._send_websocket_message(opcode=self._frame_types.close)
 
     def ping(self) -> None:
         """
@@ -112,7 +83,7 @@ class ClientSocketImpl(
         """
         if self._socket_open:
             logger.debug("Activating Ping")
-            self.send_websocket_message(opcode=self._frame_types.ping)
+            self._send_websocket_message(opcode=self._frame_types.ping)
 
     def on(self, event: str, handler: Callable) -> None:
         """
@@ -125,3 +96,13 @@ class ClientSocketImpl(
         if event not in self._event_handlers:
             self._event_handlers[event] = []
         self._event_handlers[event].append(handler)
+
+    def emit(self, event: str, payload: (str | bytes | dict | None)) -> None:
+        json_data: dict = {event: payload}
+
+        payload: str = json.dumps(json_data)
+
+        frames = self._frame_encoder.encode_payload_to_frames(payload=payload)
+
+        for frame in frames:
+            self._client_socket.send(frame)
