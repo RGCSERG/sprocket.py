@@ -3,7 +3,7 @@ Provides functions for checking user entered attributes.
 """
 
 from .checkframesize import *
-from .checktcpport import *
+from .checkport import *
 from .checkifcontrol import *
 
 """Permission is hereby granted, free of charge, to any person obtaining a copy
