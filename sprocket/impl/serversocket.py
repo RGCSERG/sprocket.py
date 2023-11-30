@@ -6,7 +6,7 @@ copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+copies or substantial portions of the Sofloggertware.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -17,7 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 import socket, threading, json
-from typing import Any, Callable, Final, List, Optional
+from typing import Callable, Final, List, Optional
 from loguru import logger
 from .serversocketbase import *
 
@@ -29,18 +29,18 @@ class ServerSocketImpl(
 ):  # rework with new frame encoder and websocketframe class updates + comments
     def __init__(
         self,
-        TCP_HOST: Optional[str] = "localhost",
-        TCP_PORT: Optional[int] = 1000,
-        TCP_BUFFER_SIZE: Optional[int] = 8192,
+        HOST: Optional[str] = "localhost",
+        PORT: Optional[int] = 1000,
+        BUFFER_SIZE: Optional[int] = 8192,
         WS_ENDPOINT: Optional[str] = "/websocket",
         MAX_FRAME_SIZE: Optional[int] = 125,
         TIMEOUT: Optional[int] = 5,
         BACKLOG: Optional[int] = 5,
     ) -> None:
         super().__init__(
-            TCP_HOST=TCP_HOST,
-            TCP_PORT=TCP_PORT,
-            TCP_BUFFER_SIZE=TCP_BUFFER_SIZE,
+            HOST=HOST,
+            PORT=PORT,
+            BUFFER_SIZE=BUFFER_SIZE,
             WS_ENDPOINT=WS_ENDPOINT,
             MAX_FRAME_SIZE=MAX_FRAME_SIZE,
             TIMEOUT=TIMEOUT,
@@ -54,7 +54,7 @@ class ServerSocketImpl(
         and starts a separate thread to handle incoming messages from each client instance.
         """
         self._server_socket.listen(self._BACKLOG)
-        logger.debug(f"Listening on port: {self._TCP_PORT}")
+        logger.debug(f"Listening on port: {self._PORT}")
 
         listen_thread = threading.Thread(target=self._listen_for_messages)
         listen_thread.start()
@@ -69,7 +69,7 @@ class ServerSocketImpl(
         Args:
             message Optional[str]: The message to broadcast to clients.
         """
-        for client_socket in self._ws_sockets:
+        for socket in self._ws_sockets:
             try:
                 if event != "":
                     message = f"{event}:{message}"
@@ -77,46 +77,21 @@ class ServerSocketImpl(
                 else:
                     frames = self._frame_encoder.encode_payload_to_frames(message)
                 for frame in frames:
-                    client_socket.send(frame)
+                    socket.send(frame)
             except Exception as e:
                 # Handle any errors or disconnections here
                 logger.warning(f"Error broadcasting message to client: {e}")
 
-    def send_websocket_message(
-        self,
-        socket: socket,
-        payload: Optional[str] = "",
-        opcode: Optional[bytes] = 0x1,
-    ) -> None:
-        """
-        Send a WebSocket message to a specific client.
-        This method sends a WebSocket message to a specific client identified by the provided socket.
-
-        Args:
-            socket socket: The client socket to send the message to.
-            message Optional[str]: The message to send to the client.
-            event Optional[str]: An optional event identifier for the message.
-            opcode Optional[bytes]: The WebSocket frame opcode.
-        """
-        logger.debug("Sending Message")
-
-        frames = self._frame_encoder.encode_payload_to_frames(
-            payload=payload, opcode=opcode
-        )
-
-        for frame in frames:
-            socket.send(frame)
-
-    def ping(self, client_socket: socket) -> None:
+    def ping(self, socket: socket) -> None:
         """
         Send a WebSocket Ping frame to a specific client.
         This method sends a WebSocket Ping frame to a specific client, prompting a Pong response.
 
         Args:
-            client_socket socket: The client socket to send the Ping frame to.
+            socket socket: The client socket to send the Ping frame to.
         """
-        self.send_websocket_message(
-            client_socket=client_socket, opcode=self.control_frame_types.ping
+        self._send_websocket_message(
+            socket=socket, opcode=self.control_frame_types.ping
         )
 
     def on(self, event: str, handler: Callable) -> None:
@@ -132,41 +107,41 @@ class ServerSocketImpl(
             self._event_handlers[event] = []
         self._event_handlers[event].append(handler)
 
-    # def join_room(self, room_name: str, client_socket: socket) -> None:
-    #     """
-    #     Add a client to a specific chat room.
-    #     This method adds a client (identified by their socket) to a specified chat room.
+    def join_room(self, room_name: str, socket: socket) -> None:
+        """
+        Add a client to a specific chat room.
+        This method adds a client (identified by their socket) to a specified chat room.
 
-    #     Args:
-    #         client_socket socket: The client socket to be added to the chat room.
-    #         room_name str: The name of the chat room to join.
-    #     """
-    #     if room_name not in self._rooms:
-    #         self._rooms[room_name] = []
-    #     self._rooms[room_name].append(client_socket)
+        Args:
+            socket socket: The client socket to be added to the chat room.
+            room_name str: The name of the chat room to join.
+        """
+        if room_name not in self._rooms:
+            self._rooms[room_name] = []
+        self._rooms[room_name].append(socket)
 
-    # def to(self, room_name: str):
-    #     if room_name not in self._rooms:
-    #         self._rooms[room_name] = []
+    def to(self, room_name: str):
+        if room_name not in self._rooms:
+            self._rooms[room_name] = []
 
-    #     return RoomEmitter(self, self._rooms[room_name])
+        return RoomEmitter(self, self._rooms[room_name])
 
-    # def leave_room(self, client_socket: socket, room_name: Optional[str] = "") -> None:
-    #     """
-    #     Remove a client from a specific chat room.
-    #     This method removes a client (identified by their socket) from a specified chat room.
+    def leave_room(self, socket: socket, room_name: Optional[str] = "") -> None:
+        """
+        Remove a client from a specific chat room.
+        This method removes a client (identified by their socket) from a specified chat room.
 
-    #     Args:
-    #         client_socket socket: The client socket to be removed from the chat room.
-    #         room_name str: The name of the chat room to leave.
-    #     """
-    #     if room_name != "":
-    #         if room_name in self._rooms and client_socket in self._rooms[room_name]:
-    #             self._rooms[room_name].remove(client_socket)
-    #     else:
-    #         for room_name in self._rooms:
-    #             if client_socket in self._rooms[room_name]:
-    #                 self._rooms[room_name].remove(client_socket)
+        Args:
+            socket socket: The client socket to be removed from the chat room.
+            room_name str: The name of the chat room to leave.
+        """
+        if room_name != "":
+            if room_name in self._rooms and socket in self._rooms[room_name]:
+                self._rooms[room_name].remove(socket)
+        else:
+            for room_name in self._rooms:
+                if socket in self._rooms[room_name]:
+                    self._rooms[room_name].remove(socket)
 
     # def broadcast_to_room(
     #     self,
@@ -187,21 +162,9 @@ class ServerSocketImpl(
     #     if self._rooms[room_name] and client_socket in self._rooms[room_name]:
     #         for socket in self._rooms[room_name]:
     #             if client_socket != socket:
-    #                 self.send_websocket_message(
+    #                 self._send_websocket_message(
     #                     message=message, client_socket=socket, event=event
     #                 )
-
-    def _emit(
-        self, event: str, payload: (str | bytes | dict | None), socket: socket
-    ) -> None:
-        json_data: dict = {event: payload}
-
-        payload: str = json.dumps(json_data)
-
-        frames = self._frame_encoder.encode_payload_to_frames(payload=payload)
-
-        for frame in frames:
-            self.send(frame)
 
 
 class RoomEmitter:
