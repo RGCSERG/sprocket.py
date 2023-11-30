@@ -57,6 +57,7 @@ class ServerSocketImpl(
         logger.debug(f"Listening on port: {self._PORT}")
 
         listen_thread = threading.Thread(target=self._listen_for_messages)
+        self.main_thread = True
         listen_thread.start()
 
     def broadcast_message(
@@ -142,6 +143,11 @@ class ServerSocketImpl(
             for room_name in self._rooms:
                 if socket in self._rooms[room_name]:
                     self._rooms[room_name].remove(socket)
+
+    def stop(self):
+        for socket in self._active_sockets:
+            self._close_socket(socket=socket)
+        self.main_thread = False
 
     # def broadcast_to_room(
     #     self,
