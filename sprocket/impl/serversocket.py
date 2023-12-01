@@ -49,36 +49,36 @@ class ServerSocketImpl(
 
     def start(self) -> None:
         """
-        Starts the WebSocket server and listen for incoming connections.
+        Starts the WebSocket server and listens for incoming connections.
         This method listens for incoming connections on the specified host and port,
         and starts a separate thread to handle incoming messages from each client instance.
         """
-        self._server_socket.listen(self._BACKLOG)
-        logger.debug(f"Listening on port: {self._PORT}")
+        self._server_socket.listen(
+            self._BACKLOG
+        )  # Start listening proccess, specifiying maxiumum queue.
+        logger.success(f"Listening on port: {self._PORT}")  # Return log message.
 
-        listen_thread = threading.Thread(target=self._listen_for_messages)
-        self.main_thread = True
-        listen_thread.start()
+        listen_thread = threading.Thread(
+            target=self._listen_for_messages
+        )  # Initialise listening thread.
+        self.main_thread = True  # Set thread base case.
+        listen_thread.start()  # Start listening thread.
 
     def broadcast_message(
-        self, message: Optional[str] = "", event: Optional[str] = ""
+        self, event: Optional[str] = "", payload: (str | bytes | dict | None) = ""
     ) -> None:
         """
         Broadcast a message to all connected WebSocket clients.
         This method sends a message to all WebSocket clients currently connected to the server.
 
         Args:
-            message Optional[str]: The message to broadcast to clients.
+            payload Optional[str]: The message to broadcast to clients.
         """
-        for socket in self._ws_sockets:
+        for socket in self._ws_sockets:  # For each active socket.
             try:
-                if event != "":
-                    message = f"{event}:{message}"
-                    frames = self._frame_encoder.encode_payload_to_frames(message)
-                else:
-                    frames = self._frame_encoder.encode_payload_to_frames(message)
-                for frame in frames:
-                    socket.send(frame)
+                self._emit(
+                    event=event, socket=socket, payload=payload
+                )  # Emit the message.
             except Exception as e:
                 # Handle any errors or disconnections here
                 logger.warning(f"Error broadcasting message to client: {e}")
@@ -93,7 +93,7 @@ class ServerSocketImpl(
         """
         self._send_websocket_message(
             socket=socket, opcode=self.control_frame_types.ping
-        )
+        )  # Send a ping frame to the client socket.
 
     def on(self, event: str, handler: Callable) -> None:
         """
@@ -104,9 +104,13 @@ class ServerSocketImpl(
             event str: The event to listen for.
             handler Callable: The function to be executed when the event occurs.
         """
-        if event not in self._event_handlers:
-            self._event_handlers[event] = []
-        self._event_handlers[event].append(handler)
+        if event not in self._event_handlers:  # If event not found.
+            self._event_handlers[
+                event
+            ] = []  # Append it to the _event_handlers dictionary.
+        self._event_handlers[event].append(
+            handler
+        )  # Then append the provided handler to the dictionary entry.
 
     def join_room(self, room_name: str, socket: socket) -> None:
         """
@@ -117,9 +121,9 @@ class ServerSocketImpl(
             socket socket: The client socket to be added to the chat room.
             room_name str: The name of the chat room to join.
         """
-        if room_name not in self._rooms:
-            self._rooms[room_name] = []
-        self._rooms[room_name].append(socket)
+        if room_name not in self._rooms:  # If the room name does not exist.
+            self._rooms[room_name] = []  # Create the room with the provided name.
+        self._rooms[room_name].append(socket)  # Append the client socket to the room.
 
     def to(
         self, room_name: str
@@ -136,7 +140,9 @@ class ServerSocketImpl(
         if room_name not in self._rooms:  # Implement some error handling logic.
             self._rooms[room_name] = []  # Not a viable solution.
 
-        room_users: list = self._rooms[room_name]
+        room_users: list = self._rooms[
+            room_name
+        ]  # Set list of sockets to list room_users.
 
         return RoomEmitter(server_socket=self, room_users=room_users)
 
@@ -149,41 +155,33 @@ class ServerSocketImpl(
             socket socket: The client socket to be removed from the chat room.
             room_name str: The name of the chat room to leave.
         """
-        if room_name != "":
-            if room_name in self._rooms and socket in self._rooms[room_name]:
-                self._rooms[room_name].remove(socket)
-        else:
-            for room_name in self._rooms:
-                if socket in self._rooms[room_name]:
-                    self._rooms[room_name].remove(socket)
+        if (
+            room_name in self._rooms and socket in self._rooms[room_name]
+        ):  # If room name provided, and the socket in that room.
+            self._rooms[room_name].remove(
+                socket
+            )  # Remove the socket from the provided room.
+            return  # Return so no more code is run.
+
+        for (
+            room_name
+        ) in (
+            self._rooms
+        ):  # If no room_name provided, iterate through every individual room.
+            if (
+                socket in self._rooms[room_name]
+            ):  # If the socket is in the current room.
+                self._rooms[room_name].remove(
+                    socket
+                )  # Remove the socket from the room.
 
     def stop(self):
-        for socket in self._active_sockets:
-            self._close_socket(socket=socket)
-        self.main_thread = False
-
-    # def broadcast_to_room(
-    #     self,
-    #     room_name: str,
-    #     message: str,
-    #     client_socket: Optional[Any] = None,
-    #     event: Optional[str] = "",
-    # ) -> None:
-    #     """
-    #     Broadcast a message to all clients in a specific chat room.
-    #     This method sends a message to all clients who are part of a specific chat room.
-
-    #     Args:
-    #         client_socket socket: The client socket which sent the message
-    #         message str: The message to broadcast to clients in the chat room.
-    #     """
-
-    #     if self._rooms[room_name] and client_socket in self._rooms[room_name]:
-    #         for socket in self._rooms[room_name]:
-    #             if client_socket != socket:
-    #                 self._send_websocket_message(
-    #                     message=message, client_socket=socket, event=event
-    #                 )
+        """
+        Shuts down the server socket, without forcing clients to close connection.
+        """
+        for socket in self._active_sockets:  # For each active socket.
+            self._close_socket(socket=socket)  # Send a control close connection frame.
+        self.main_thread = False  # Terminate the server listening thread.
 
 
 class RoomEmitter:
@@ -216,5 +214,5 @@ class RoomEmitter:
         """
         for socket in self._room_users:  # Iterates through each socket in the room.
             self._server_socket._emit(
-                event=event, payload=payload, socket=socket
+                event=event, socket=socket, payload=payload
             )  # For each socket in the room, a message is directly sent.
