@@ -209,7 +209,7 @@ class ServerSocketBaseImpl:
         return
 
     def _emit(
-        self, event: str, payload: (str | bytes | dict | None), socket: socket
+        self, event: str, socket: socket, payload: (str | bytes | dict | None) = ""
     ) -> None:
         json_data: dict = {event: payload}
 
