@@ -43,7 +43,7 @@ __all__: Final[List[str]] = ["ClientSocketBaseImpl"]
 
 class ClientSocketBaseImpl(
     ClientSocket
-):  # rework with new frame encoder and websocketframe class updates + comments
+):  # rework with new frame encoder and websocketframe class updates + comments + sort layout
     def __init__(
         self,
         HOST: Optional[str] = "localhost",
