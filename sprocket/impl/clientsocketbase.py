@@ -49,13 +49,12 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
         TIMEOUT: Optional[int] = 5,
         MAX_FRAME_SIZE: Optional[int] = 125,
     ) -> None:
-        # Constructor Method
         if PORT is not None and not check_port(
             PORT=PORT  # Checks if provided value is valid.
-        ):  # Checks if PORT is not none, if not then checks whether the provided value is valid.
+        ):  # Checks if TCP_PORT is not none, if not then checks whether the provided value is valid.
             raise TCPPortException  # If value provided is not valid, raise ValueError
         else:
-            # If no value provided, set _PORT to default value
+            # If no value provided, set _PORT to default value.
             self._PORT = PORT
 
         if MAX_FRAME_SIZE is not None and not check_frame_size(
@@ -63,52 +62,53 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
         ):  # Checks if MAX_FRAME_SIZE is not none, if not then checks whether the provided value is valid.
             raise FrameSizeException  # If value provided is not valid raise ValueError.
         else:
-            # value not set in this class
+            # Value not set in this class.
             pass
 
-        self._TCP_KEY = self._generate_random_websocket_key()  # Generate websocket key.
-        self._HOST = HOST  # Set _HOST.
-        self._BUFFER_SIZE = BUFFER_SIZE  # Set _BUFFER_SIZE.
-        self._TIMEOUT = TIMEOUT  # Set _TIMEOUT.
-        # ---------------------- #
+        self._WEBSOCKET_KEY = (
+            self._generate_random_websocket_key()
+        )  # Generate websocket key.
+        self._HOST = HOST  # Set Host doamin.
+        self._BUFFER_SIZE = BUFFER_SIZE  # Set buffer size (in bits).
+        self._TIMEOUT = TIMEOUT  # Set select socket timeout.
         self._LOCK = threading.Lock()  # Set _LOCK.
-        self._socket_open = False  # Set _socket_open.
-        self._frame_decoder = WebSocketFrameDecoder(status=True)  # Set _frame_decoder.
-        self._frame_encoder = WebSocketFrameEncoder(
-            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True  # Set _frame_encoder.
-        )
-        self._frame_types = FrameOpcodes()  # Set _frame_types.
+        # ---------------------- #
         self._event_handlers: Dict[
             str, List[Callable]
         ] = {}  # Initialise _event_handlers.
+        self._socket_open = False  # Initialise _socket_open to open (True).
+        self._frame_decoder = WebSocketFrameDecoder(
+            status=True
+        )  # Initialise _frame_decoder.
+        self._frame_encoder = WebSocketFrameEncoder(
+            MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True
+        )  # Initialise _frame_encoder.
 
         self._setup_socket()  # Setup socket.
 
     # Private methods
 
     def _check_control_frame(self, opcode: bytes) -> None:
-        # Handle control frames
         if (
-            opcode == self._frame_types.close
+            opcode == FrameOpcodes.close
         ):  # Check if recieved frame opcode is a connection close opcode.
             self._close_socket()  # Close the socket connection.
             return
         if (
-            opcode == self._frame_types.ping
+            opcode == FrameOpcodes.ping
         ):  # Check if recieved frame opcode is a ping opcode.
             logger.debug(f"Received Ping from Server.")
             self._pong()  # Send a pong frame in response.
             return
         if (
-            opcode == self._frame_types.pong
+            opcode == FrameOpcodes.pong
         ):  # Check if recieved frame opcode is a pong opcode.
             logger.success(f"Received Pong from Server.")  #
             return
 
     def _pong(self) -> None:
-        # Send Pong response
         self._send_websocket_message(
-            opcode=self._frame_types.pong
+            opcode=FrameOpcodes.pong
         )  # Send a pong frame using _send_websocket_message method.
 
     def _send_websocket_message(
@@ -116,14 +116,14 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
         payload: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
     ) -> None:
-        """
-        Send a WebSocket message to the server.
+        # """
+        # Send a WebSocket message to the server.
 
-        Args:
-            message Optional[str]: The message to send.
-            event Optional[str]: The event name associated with the message.
-            opcode Optional[bytes]: The opcode indicating the type of message.
-        """
+        # Args:
+        #     message Optional[str]: The message to send.
+        #     event Optional[str]: The event name associated with the message.
+        #     opcode Optional[bytes]: The opcode indicating the type of message.
+        # """
         if self._socket_open:
             logger.debug("Sending Message")
 
@@ -238,7 +238,7 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
             f"Host: {self._HOST}:{self._PORT}\r\n"
             "Upgrade: websocket\r\n"
             "Connection: Upgrade\r\n"
-            f"Sec-WebSocket-Key: {self._TCP_KEY}\r\n"
+            f"Sec-WebSocket-Key: {self._WEBSOCKET_KEY}\r\n"
             f"Sec-WebSocket-Version: 13\r\n"
             "\r\n"
         )
