@@ -177,13 +177,13 @@ class ServerSocketBaseImpl:
         )  # Append socket to _active_sockets.
 
     def _create_sec_accept_key(self, sec_websocket_key: str) -> bytes:
-        # Concatenate the provided key with the WebSocket GUID
+        # Concatenate the provided key with the WebSocket GUID.
         concatenated_key: str = sec_websocket_key + self._WEBSOCKET_GUID
 
-        # Generate SHA1 hash of the concatenated string
+        # Generate SHA1 hash of the concatenated string.
         sha1_hash: bytes = hashlib.sha1(concatenated_key.encode()).digest()
 
-        # Encode the hash in base64
+        # Encode the hash in base64.
         encoded_key: bytes = base64.b64encode(sha1_hash)
 
         return encoded_key
