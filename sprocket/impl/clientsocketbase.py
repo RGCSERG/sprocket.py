@@ -134,7 +134,7 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
             for frame in frames:
                 self._client_socket.send(frame)
 
-    def _handle_websocket_message(self) -> None:
+    def _handle_message(self) -> None:
         # Handle incoming WebSocket messages
         frame_in_bytes: bytes = b""  # Initialise frame_in_bytes.
         final_message: str = ""  # Initialise final_message.
@@ -265,4 +265,4 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
 
     def _listen_for_messages(self) -> None:
         while self._socket_open:
-            self._handle_websocket_message()
+            self._handle_message()

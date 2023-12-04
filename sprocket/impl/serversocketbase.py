@@ -320,7 +320,7 @@ class ServerSocketBaseImpl:
         # Check the FIN bit in the first byte of the frame.
         return (frame_in_bytes[0] & 0x80) >> 7 == 1
 
-    def _handle_websocket_message(self, socket: socket) -> None:
+    def _handle_message(self, socket: socket) -> None:
         frame_in_bytes: bytes = b""
         final_message: str = ""
 
@@ -368,7 +368,7 @@ class ServerSocketBaseImpl:
                     # self._remove_socket_from_lists(socket=client_socket)
                     continue
                 elif client_socket in self._websocket_sockets:
-                    self._handle_websocket_message(socket=client_socket)
+                    self._handle_message(socket=client_socket)
                 else:
                     self._handle_request(socket=client_socket)
 
