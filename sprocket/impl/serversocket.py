@@ -64,6 +64,56 @@ class ServerSocketImpl(
         self.main_thread = True  # Set thread base case.
         listen_thread.start()  # Start listening thread.
 
+    def leave_room(self, socket: socket, room_name: Optional[str] = "") -> None:
+        """
+        Remove a client from a specific chat room.
+        This method removes a client (identified by their socket) from a specified chat room.
+
+        Args:
+            socket socket: The client socket to be removed from the chat room.
+            room_name str: The name of the chat room to leave.
+        """
+        if (
+            room_name in self._rooms and socket in self._rooms[room_name]
+        ):  # If room name provided, and the socket in that room.
+            self._rooms[room_name].remove(
+                socket
+            )  # Remove the socket from the provided room.
+            return  # Return so no more code is run.
+
+        for (
+            room_name
+        ) in (
+            self._rooms
+        ):  # If no room_name provided, iterate through every individual room.
+            if (
+                socket in self._rooms[room_name]
+            ):  # If the socket is in the current room.
+                self._rooms[room_name].remove(
+                    socket
+                )  # Remove the socket from the room.
+
+    def stop(self):
+        """
+        Shuts down the server socket, without forcing clients to close connection.
+        """
+        for socket in self._active_sockets:  # For each active socket.
+            self._close_socket(socket=socket)  # Send a control close connection frame.
+        self.main_thread = False  # Terminate the server listening thread.
+
+    def join_room(self, room_name: str, socket: socket) -> None:
+        """
+        Add a client to a specific chat room.
+        This method adds a client (identified by their socket) to a specified chat room.
+
+        Args:
+            socket socket: The client socket to be added to the chat room.
+            room_name str: The name of the chat room to join.
+        """
+        if room_name not in self._rooms:  # If the room name does not exist.
+            self._rooms[room_name] = []  # Create the room with the provided name.
+        self._rooms[room_name].append(socket)  # Append the client socket to the room.
+
     def broadcast_message(
         self, event: Optional[str] = "", payload: (str | bytes | dict | None) = ""
     ) -> None:
@@ -112,19 +162,6 @@ class ServerSocketImpl(
             handler
         )  # Then append the provided handler to the dictionary entry.
 
-    def join_room(self, room_name: str, socket: socket) -> None:
-        """
-        Add a client to a specific chat room.
-        This method adds a client (identified by their socket) to a specified chat room.
-
-        Args:
-            socket socket: The client socket to be added to the chat room.
-            room_name str: The name of the chat room to join.
-        """
-        if room_name not in self._rooms:  # If the room name does not exist.
-            self._rooms[room_name] = []  # Create the room with the provided name.
-        self._rooms[room_name].append(socket)  # Append the client socket to the room.
-
     def to(
         self, room_name: str
     ) -> Type["RoomEmitter"]:  # Type is used here to avoid undefined errors.
@@ -146,43 +183,6 @@ class ServerSocketImpl(
 
         return RoomEmitter(server_socket=self, room_users=room_users)
 
-    def leave_room(self, socket: socket, room_name: Optional[str] = "") -> None:
-        """
-        Remove a client from a specific chat room.
-        This method removes a client (identified by their socket) from a specified chat room.
-
-        Args:
-            socket socket: The client socket to be removed from the chat room.
-            room_name str: The name of the chat room to leave.
-        """
-        if (
-            room_name in self._rooms and socket in self._rooms[room_name]
-        ):  # If room name provided, and the socket in that room.
-            self._rooms[room_name].remove(
-                socket
-            )  # Remove the socket from the provided room.
-            return  # Return so no more code is run.
-
-        for (
-            room_name
-        ) in (
-            self._rooms
-        ):  # If no room_name provided, iterate through every individual room.
-            if (
-                socket in self._rooms[room_name]
-            ):  # If the socket is in the current room.
-                self._rooms[room_name].remove(
-                    socket
-                )  # Remove the socket from the room.
-
-    def stop(self):
-        """
-        Shuts down the server socket, without forcing clients to close connection.
-        """
-        for socket in self._active_sockets:  # For each active socket.
-            self._close_socket(socket=socket)  # Send a control close connection frame.
-        self.main_thread = False  # Terminate the server listening thread.
-
 
 class RoomEmitter:
     """
@@ -192,7 +192,7 @@ class RoomEmitter:
 
     def __init__(self, server_socket: ServerSocketImpl, room_users: list) -> None:
         """
-        Initialiser method
+        Initialiser method.
 
         Args:
             server_socket ServerSocketImpl: The current instance of the server.
