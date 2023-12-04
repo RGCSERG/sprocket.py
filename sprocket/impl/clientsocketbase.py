@@ -33,7 +33,6 @@ from ..frame_models import (
     WebSocketFrameDecoder,
     FrameOpcodes,
 )  # Import used classes.
-from ..sockets import ClientSocket  # Import Abstract model.
 from ..functions import check_port, check_frame_size  # Import used functions.
 from ..exceptions import TCPPortException, FrameSizeException  # Import used exceptions.
 
@@ -41,9 +40,7 @@ from ..exceptions import TCPPortException, FrameSizeException  # Import used exc
 __all__: Final[List[str]] = ["ClientSocketBaseImpl"]
 
 
-class ClientSocketBaseImpl(
-    ClientSocket
-):  # rework with new frame encoder and websocketframe class updates + comments + sort layout
+class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe class updates + comments + sort layout
     def __init__(
         self,
         HOST: Optional[str] = "localhost",

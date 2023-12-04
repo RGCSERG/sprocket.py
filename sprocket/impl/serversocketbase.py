@@ -32,7 +32,6 @@ from ..frame_models import (
     WebSocketFrameDecoder,
     FrameOpcodes,
 )  # Import used classes.
-from ..sockets import ServerSocket  # Import Abstract model.
 from ..functions import check_port, check_frame_size  # Import used functions.
 from ..exceptions import TCPPortException, FrameSizeException  # Import used exceptions.
 from .requesthandler import *
@@ -168,7 +167,7 @@ class ServerSocketBaseImpl:
         )  # Initialise the socket.
         self._server_socket.setsockopt(
             socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
-        )  #  Enable reusing the address and port.
+        )  #  Enable re-use of the address and port.
         self._server_socket.bind(
             (self._HOST, self._PORT)
         )  # Bind the socket to specified host and port.
