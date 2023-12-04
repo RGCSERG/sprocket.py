@@ -484,24 +484,34 @@ class ServerSocketBaseImpl:
         try:
             readable_sockets: list = select.select(
                 self._active_sockets, self._websocket_sockets, [], self._TIMEOUT
-            )[0]
+            )[
+                0
+            ]  # Check if the socket is readable.
 
-            while client_socket in readable_sockets:
+            while client_socket in readable_sockets:  # While the socket is readable.
                 if client_socket.fileno() == -1:
-                    # self._remove_socket_from_lists(socket=client_socket)
+                    # No data to be read, so carry on to the next cycle.
                     continue
-                elif client_socket in self._websocket_sockets:
-                    self._handle_message(socket=client_socket)
+                elif (
+                    client_socket in self._websocket_sockets
+                ):  # If the socket has opened a WebSocket connection.
+                    self._handle_message(
+                        socket=client_socket
+                    )  # Handle the Websocket message.
                 else:
-                    self._handle_request(socket=client_socket)
+                    self._handle_request(
+                        socket=client_socket
+                    )  # Handle normal HTTP request.
 
-        except ConnectionResetError:
-            critical = True
+        except ConnectionResetError:  # If a Connection reset error occurs.
+            critical = True  # Set cirital to True.
 
-        if not critical:
+        if not critical:  # If no error has occured.
             logger.warning(f"Closed socket: {client_socket}")
+
             return
 
+        # If an error has occcured removed the socket from readable lists, as not to cause more errors.
         self._remove_socket_from_lists(socket=client_socket)
         self.leave_room(socket=client_socket)
 
@@ -510,8 +520,14 @@ class ServerSocketBaseImpl:
         return
 
     def _handle_connection(self) -> None:
-        new_socket, socket_address = self._server_socket.accept()
-        self._active_sockets.append(new_socket)
+        (
+            new_socket,
+            socket_address,
+        ) = self._server_socket.accept()  # Accept the connection.
+
+        self._active_sockets.append(
+            new_socket
+        )  # Append the socket to the active sockets list.
 
         logger.success(
             "New WebSocket connection: ",
@@ -520,6 +536,7 @@ class ServerSocketBaseImpl:
             socket_address,
         )
 
+        # Create a new client thread and start it.
         client_listening_thread = threading.Thread(
             target=self._create_new_client_thread, args=[new_socket]
         )
@@ -528,16 +545,17 @@ class ServerSocketBaseImpl:
         return
 
     def _listen_for_messages(self) -> None:
-        while True:
-            if not self.main_thread:
-                break
+        while self.main_thread:  # While the server is active.
             readable_sockets: list = select.select(
                 self._active_sockets, [], [], self._TIMEOUT
-            )[0]
+            )[
+                0
+            ]  # Retrieve readable sockets.
 
-            for socket in readable_sockets:
+            for socket in readable_sockets:  # For each readable socket.
                 if socket.fileno() == -1:
-                    self._remove_socket_from_lists(socket=socket)
-                if socket == self._server_socket:
-                    logger.success("Handling incoming HTTP message.")
-                    self._handle_connection()
+                    # There is no data to be read.
+                    continue
+                if socket == self._server_socket:  # If the socket is the server socket.
+                    logger.success("Handling New HTTP connection.")
+                    self._handle_connection()  # Handle the incomming HTTP connection.
