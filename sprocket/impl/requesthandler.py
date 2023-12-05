@@ -19,6 +19,7 @@ SOFTWARE."""
 from http import HTTPStatus
 from loguru import logger
 from typing import (
+    Any,
     Final,
     List,
     Literal,
@@ -38,7 +39,8 @@ class HTTPRequestHandler:
         self.headers: dict = {}
         self.http_version: str = ""
 
-    def _parse_request_line(self, request_line: list[str]) -> tuple[str, str, str]:
+    @staticmethod
+    def _parse_request_line(request_line: list[str]) -> tuple[str, str, str]:
         method: str
         target: str
         http_version: str
@@ -82,8 +84,8 @@ class HTTPRequestHandler:
         )
         return headers_valid
 
-    def _parse_request(self, request_data: str) -> tuple[str, str, dict, str]:
-        # Split the request data into lines to parse individual components
+    def _parse_request(self, request_data: str) -> tuple[str, str, dict, str] | None:
+        # Split the request data into lines to parse individual components.
         request_list: list[str] = request_data.split("\r\n")
 
         if not request_list:
@@ -101,7 +103,7 @@ class HTTPRequestHandler:
 
     def process_request(
         self, request_data: str
-    ) -> tuple[str, Literal[False]] | tuple[dict, Literal[True]]:
+    ) -> tuple[str, Literal[False]] | tuple[dict | Any, Literal[True]]:
         response_body = "<html><body><h1>Default bad response</h1></body></html>"
         response_headers = f"HTTP/1.1 {HTTPStatus.BAD_REQUEST}\r\nContent-Length: {len(response_body)}\r\n\r\n"
 
@@ -109,7 +111,7 @@ class HTTPRequestHandler:
 
         self.request_data = request_data
 
-        request = self._parse_request(self.request_data)
+        request = self._parse_request(request_data=self.request_data)
 
         method, target, headers, http_version = request
 
