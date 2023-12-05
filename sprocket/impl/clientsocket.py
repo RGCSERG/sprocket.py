@@ -45,7 +45,9 @@ class ClientSocketImpl(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE,
         )
 
-        self.ID = random.randint(1000000, 9999999)
+        self.ID = random.randint(
+            1000000, 9999999
+        )  # maybe implement some decent id system
 
     def start(self) -> None:
         """
