@@ -41,7 +41,7 @@ from ..exceptions import TCPPortException, FrameSizeException  # Import used exc
 __all__: Final[List[str]] = ["ClientSocketBaseImpl"]
 
 
-class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe class updates + comments + sort layout
+class ClientSocketBaseImpl:
     def __init__(
         self,
         HOST: Optional[str] = "localhost",
@@ -86,7 +86,7 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
         )  # Initialise _frame_encoder.
         self._response_handler: HTTPResponseHandler = HTTPResponseHandler(
             WEBSOCKET_KEY=self._WEBSOCKET_KEY
-        )
+        )  # Initialise _response_handler.
 
         self._setup_socket()  # Setup socket.
 
@@ -215,9 +215,12 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
             handshake_request
         )  # Send the handshake request to the server.
 
-        response: str = self._read_recv().decode("utf-8")  # Retrieve the response.
+        response: str = self._read_recv()
 
-        if self._response_handler.validate_handshake_response(
+        if response:
+            response = response.decode("utf-8")  # Retrieve the response.
+
+        if response and self._response_handler.validate_handshake_response(
             handshake_response=response
         ):
             logger.success("Connection to server complete.")
