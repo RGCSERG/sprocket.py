@@ -122,21 +122,6 @@ class ServerSocketBaseImpl:
 
         return formatted_guid
 
-    # @staticmethod
-    # def _get_sec_websocket_key(sec_websocket_key: str) -> str:
-    #     sec_websocket_key_bytes = sec_websocket_key.encode("utf-8")
-
-    #     decoded_sec_websocket_key: str = base64.b64decode(
-    #         sec_websocket_key
-    #     )  # As the sec_websocket_key should be base64 encoded, base64 decode it.
-
-    #     if (
-    #         len(decoded_sec_websocket_key) != 16
-    #     ):  # If the length of the decoded key is not 16.
-    #         raise SecWebSocketKeyException  # Raise an SecWebSocketKeyException.
-
-    #     return decoded_sec_websocket_key
-
     def _remove_socket_from_lists(self, socket: socket) -> None:
         if (
             socket in self._websocket_sockets
@@ -278,10 +263,6 @@ class ServerSocketBaseImpl:
         sec_websocket_key = headers.get(
             "sec-websocket-key"
         )  # Retrieve the sec-websocket-key header.
-
-        # sec_websocket_key = self._get_sec_websocket_key(
-        #     sec_websocket_key=sec_websocket_key_header  # Using the header value.
-        # )  # Retrieve the decoded sec_websocket_key.
 
         sec_accept = self._create_sec_accept_key(
             sec_websocket_key=sec_websocket_key
