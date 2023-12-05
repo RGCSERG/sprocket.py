@@ -17,7 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 
-import random, select, socket, threading, time, json  # Import used libaries.
+import random, select, socket, threading, time, json, base64, secrets  # Import used libaries.
 from typing import (
     Any,
     Callable,
@@ -28,6 +28,7 @@ from typing import (
     Optional,
 )  # Used for type annotations and decloration.
 from loguru import logger  # Used for consoPORTBUFFER_SIZEle logging.
+from .responsehandler import *
 from ..frame_models import (
     WebSocketFrameEncoder,
     WebSocketFrameDecoder,
@@ -83,10 +84,51 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
         self._frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True
         )  # Initialise _frame_encoder.
+        self._response_handler: HTTPResponseHandler = HTTPResponseHandler(
+            WEBSOCKET_KEY=self._WEBSOCKET_KEY
+        )
 
         self._setup_socket()  # Setup socket.
 
-    # Private methods
+    @staticmethod
+    def _generate_random_websocket_key() -> str:
+        # Generate a 16 byte key.
+        random_key = secrets.token_bytes(16)
+
+        # Encode the random bytes to base64.
+        base64_random_key = base64.b64encode(random_key).decode(
+            "utf-8"
+        )  # Decode with utf-8 as key is expeted to be a string.
+
+        return base64_random_key
+
+    def _setup_socket(self) -> None:
+        self._client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._client_socket.setblocking(True)
+
+    def _close_socket(self) -> None:
+        # Close the socket
+        if self._socket_open:
+            logger.warning("Closing socket")
+            self._socket_open = False
+            self._client_socket.close()
+            return
+
+    def _send_websocket_message(
+        self,
+        payload: Optional[str] = "",
+        opcode: Optional[bytes] = 0x1,
+    ) -> None:
+        logger.debug("Sending Message")
+
+        frames = self._frame_encoder.encode_payload_to_frames(
+            payload=payload, opcode=opcode
+        )  # Encoded the given payload and opcode to WebSocket frame(s).
+
+        for frame in frames:  # For each frame created.
+            self._client_socket.send(frame)  # Send the frame to the server.
+
+        return
 
     def _check_control_frame(self, opcode: bytes) -> None:
         if (
@@ -111,129 +153,55 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
             opcode=FrameOpcodes.pong
         )  # Send a pong frame using _send_websocket_message method.
 
-    def _send_websocket_message(
+    def _read_recv(
         self,
-        payload: Optional[str] = "",
-        opcode: Optional[bytes] = 0x1,
-    ) -> None:
-        # """
-        # Send a WebSocket message to the server.
-
-        # Args:
-        #     message Optional[str]: The message to send.
-        #     event Optional[str]: The event name associated with the message.
-        #     opcode Optional[bytes]: The opcode indicating the type of message.
-        # """
-        if self._socket_open:
-            logger.debug("Sending Message")
-
-            frames = self._frame_encoder.encode_payload_to_frames(
-                payload=payload, opcode=opcode
-            )
-
-            for frame in frames:
-                self._client_socket.send(frame)
-
-    def _handle_message(self) -> None:
-        # Handle incoming WebSocket messages
-        frame_in_bytes: bytes = b""  # Initialise frame_in_bytes.
-        final_message: str = ""  # Initialise final_message.
-
-        while True:  # While data is being sent.
-            frame_data = self._read_recv()
-            if not frame_data:
-                # Connection closed, or no data received.
-                break
-
-            logger.debug("Handling WebSocket message")
-
-            frame_in_bytes = frame_data
-            if not self._is_final_frame(frame_in_bytes):
-                # This is a fragmented frame
-                self._frame_decoder.decode_websocket_message(
-                    frame_in_bytes=frame_in_bytes
-                )
-                message_payload = self._frame_decoder.payload_data.decode("utf-8")
-                final_message += message_payload
-            else:
-                # This is a non-fragmented frame
-                self._frame_decoder.decode_websocket_message(
-                    frame_in_bytes=frame_in_bytes
-                )
-                control_opcode = self._frame_decoder.opcode
-                self._check_control_frame(opcode=control_opcode)
-                message_payload = self._frame_decoder.payload_data.decode("utf-8")
-                final_message += message_payload
-                break
-
-        if final_message and frame_in_bytes:
-            frame_in_bytes = b""
-            message_dict: dict = json.loads(final_message)
-
-            self._trigger_event_from_message(final_message=message_dict)
-
-    def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
-        # Trigger event handlers
-        if event in self._event_handlers:
-            for handler in self._event_handlers[event]:
-                handler(*args, **kwargs)
-
-    def _trigger_event_from_message(self, final_message: dict) -> None:
-        final_message_keys = list(final_message.keys())
-
-        event = final_message_keys[0]
-
-        if not event:
-            logger.warning(f'Message with no endpoint recieved: {final_message[""]}')
-            return
-
-        self._trigger(event, final_message[event])
-
-        return
-
-    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
-        # Check the FIN bit in the first byte of the frame.
-        return (frame_in_bytes[0] & 0x80) >> 7 == 1
-
-    def _close_socket(self) -> None:
-        # Close the socket
-        if self._socket_open:
-            logger.warning("Closing socket")
-            self._socket_open = False
-            self._client_socket.close()
-            return
-
-    def _read_recv(self) -> None:
-        # Read data from the socket
-        readable_sockets = select.select([self._client_socket], [], [], self._TIMEOUT)[
+    ) -> Any | None:
+        readable_sockets: list = select.select(
+            [self._client_socket], [], [], self._TIMEOUT
+        )[
             0
-        ]
+        ]  # Check if the socket is readable.
 
-        if self._client_socket not in readable_sockets:
-            return None
+        if (
+            self._client_socket not in readable_sockets
+        ):  # If the socket is not readable.
+            return None  # Return no data.
 
-        with self._LOCK:
-            retry_count: int = 0
-            MAX_RETRIES: Literal[5] = 5
+        with self._LOCK:  # Protect access to shared resources.
+            retry_count: int = 0  # Initialise retry count.
+            MAX_RETRIES: Literal[5] = 5  # Set MAX_RETRIES to 5.
 
-            while retry_count < MAX_RETRIES and self._client_socket in readable_sockets:
-                data = self._client_socket.recv(self._BUFFER_SIZE)
-                if data:
-                    return data
-                else:
-                    retry_count += 1
-                    delay: int = (0.1 * retry_count) ** 2
+            while (
+                retry_count < MAX_RETRIES and self._client_socket in readable_sockets
+            ):  # While the socket is readable and max retries has not been reached.
+                data = self._client_socket.recv(
+                    self._BUFFER_SIZE
+                )  # Read data from the socket.
+
+                if data:  # If there is data.
+                    return data  # Return the data.
+                else:  # If not.
+                    retry_count += 1  # Update the retry_count
+                    delay: int = (
+                        0.1 * retry_count
+                    ) ** 2  # Set exponentially increasing delay.
                     logger.warning(f"No data received, retrying in {delay} seconds...")
-                    time.sleep(delay)
+                    time.sleep(delay)  # Use delay.
 
             logger.critical("Max retries reached. Unable to read data.")
-            return None
 
-    def _perform_websocket_handshake(self) -> bool:
-        # Perform WebSocket handshake
+            return None  # Return no data.
+
+    def _perform_websocket_handshake(self, retry_count: Optional[int] = 0) -> bool:
+        retry_count = retry_count
+
+        if retry_count >= 5:
+            return False
+
         logger.debug("Performing WebSocket Handshake")
 
-        request = (
+        # Create the handshake request and encode it (utf-8).
+        handshake_request: bytes = (
             f"GET /websocket HTTP/1.1\r\n"
             f"Host: {self._HOST}:{self._PORT}\r\n"
             "Upgrade: websocket\r\n"
@@ -241,27 +209,122 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
             f"Sec-WebSocket-Key: {self._WEBSOCKET_KEY}\r\n"
             f"Sec-WebSocket-Version: 13\r\n"
             "\r\n"
-        )
+        ).encode("utf-8")
 
-        self._client_socket.send(request.encode("utf-8"))
+        self._client_socket.send(
+            handshake_request
+        )  # Send the handshake request to the server.
 
-        response = self._read_recv().decode("utf-8")
-        if "101 Switching Protocols" in response:
+        response: str = self._read_recv().decode("utf-8")  # Retrieve the response.
+
+        if self._response_handler.validate_handshake_response(
+            handshake_response=response
+        ):
+            logger.success("Connection to server complete.")
+
             self._trigger(event="connection", socket=self._client_socket)
             return True
-        else:
-            return False
 
-    @staticmethod
-    def _generate_random_websocket_key() -> str:
-        # Generate a random WebSocket key
-        characters = "0123456789ABCDEF"
-        random_key = "".join(random.choice(characters) for _ in range(32))
-        return random_key
+        retry_count += 1
 
-    def _setup_socket(self) -> None:
-        self._client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._client_socket.setblocking(True)
+        self._perform_websocket_handshake(retry_count=retry_count)
+
+    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
+        # Check the FIN bit in the first byte of the frame.
+        return (frame_in_bytes[0] & 0x80) >> 7 == 1
+
+    def _handle_message(self) -> None:
+        frame_in_bytes: bytes = b""  # Initialise frame_in_bytes.
+        final_message: str = ""  # Initialise final_message.
+
+        while True:
+            frame_data = self._read_recv()  # Read socket data.
+
+            if frame_data == None:
+                # Connection closed, or no data received.
+                break
+
+            logger.debug("Handling websocket message")
+
+            frame_in_bytes = frame_data  # set frame_in_bytes to frame_data.
+
+            if not self._is_final_frame(frame_in_bytes):
+                # This is a fragmented frame
+                self._frame_decoder.decode_websocket_message(
+                    frame_in_bytes=frame_in_bytes
+                )  # Decode the given frame.
+
+                message_payload = self._frame_decoder.payload_data.decode(
+                    "utf-8"
+                )  # Retrieve the decoded payload_data.
+
+                final_message += (
+                    message_payload  # Add the decoded message to the final message.
+                )
+            else:
+                # This is a non-fragmented frame
+                self._frame_decoder.decode_websocket_message(
+                    frame_in_bytes=frame_in_bytes
+                )  # Decode the frame.
+
+                control_opcode = (
+                    self._frame_decoder.opcode
+                )  # Retrieve the opcode (control frames can't be fragmented).
+
+                self._check_control_frame(
+                    opcode=control_opcode
+                )  # Check which opcode is present.
+
+                message_payload = self._frame_decoder.payload_data.decode(
+                    "utf-8"
+                )  # Retrieve the decoded payload_data.
+
+                final_message += (
+                    message_payload  # Add the decoded message to the final message.
+                )
+                break  # Break the loop early so no more data is read for this message.
+
+        if (
+            final_message and frame_in_bytes
+        ):  # If both the final message and frame are present.
+            frame_in_bytes = b""  # Reset the frame_in_bytes.
+
+            message_dict: dict = json.loads(
+                final_message
+            )  # Load the final message (always a dictionary).
+
+            self._trigger_event_from_message(
+                final_message=message_dict
+            )  # Trigger the event given.
+
+    def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
+        if event in self._event_handlers:  # If the event is in _event_handlers.
+            for handler in self._event_handlers[
+                event
+            ]:  # For each handler asinged to the event.
+                handler(
+                    *args,
+                    **kwargs,  # Provide required positional arguments and key arguments.
+                )  # Call the handler.
+
+    def _trigger_event_from_message(self, final_message: dict) -> None:
+        final_message_keys = list(
+            final_message.keys()
+        )  # Extract the keys from the final message.
+
+        event = final_message_keys[
+            0
+        ]  # Extract the event key (will always be first key).
+
+        if not event:  # If no event was given.
+            logger.warning(
+                f"Message with no endpoint recieved: {final_message}"
+            )  # Log the error, no execption is needed here.
+            return
+
+        self._trigger(event, final_message[event])  # Trigger the event given.
+
+        return
 
     def _listen_for_messages(self) -> None:
         while self._socket_open:
