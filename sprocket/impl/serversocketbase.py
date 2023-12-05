@@ -122,18 +122,20 @@ class ServerSocketBaseImpl:
 
         return formatted_guid
 
-    @staticmethod
-    def _get_sec_websocket_key(sec_websocket_key: str) -> str:
-        decoded_sec_websocket_key: str = base64.b64decode(
-            sec_websocket_key
-        )  # As the sec_websocket_key should be base64 encoded, base64 decode it.
+    # @staticmethod
+    # def _get_sec_websocket_key(sec_websocket_key: str) -> str:
+    #     sec_websocket_key_bytes = sec_websocket_key.encode("utf-8")
 
-        if (
-            len(decoded_sec_websocket_key) != 16
-        ):  # If the length of the decoded key is not 16.
-            raise SecWebSocketKeyException  # Raise an SecWebSocketKeyException.
+    #     decoded_sec_websocket_key: str = base64.b64decode(
+    #         sec_websocket_key
+    #     )  # As the sec_websocket_key should be base64 encoded, base64 decode it.
 
-        return decoded_sec_websocket_key
+    #     if (
+    #         len(decoded_sec_websocket_key) != 16
+    #     ):  # If the length of the decoded key is not 16.
+    #         raise SecWebSocketKeyException  # Raise an SecWebSocketKeyException.
+
+    #     return decoded_sec_websocket_key
 
     def _remove_socket_from_lists(self, socket: socket) -> None:
         if (
@@ -214,6 +216,7 @@ class ServerSocketBaseImpl:
 
     def _create_sec_accept_key(self, sec_websocket_key: str) -> bytes:
         # Concatenate the provided key with the WebSocket GUID.
+
         concatenated_key: str = sec_websocket_key + self._WEBSOCKET_GUID
 
         # Generate SHA1 hash of the concatenated string.
@@ -272,13 +275,13 @@ class ServerSocketBaseImpl:
         return
 
     def _handle_handshake(self, socket: socket, headers: dict) -> None:
-        sec_websocket_key_header = headers.get(
+        sec_websocket_key = headers.get(
             "sec-websocket-key"
         )  # Retrieve the sec-websocket-key header.
 
-        sec_websocket_key = self._get_sec_websocket_key(
-            sec_websocket_key=sec_websocket_key_header  # Using the header value.
-        )  # Retrieve the decoded sec_websocket_key.
+        # sec_websocket_key = self._get_sec_websocket_key(
+        #     sec_websocket_key=sec_websocket_key_header  # Using the header value.
+        # )  # Retrieve the decoded sec_websocket_key.
 
         sec_accept = self._create_sec_accept_key(
             sec_websocket_key=sec_websocket_key
