@@ -28,6 +28,7 @@ from typing import (
     Optional,
 )  # Used for type annotations and decloration.
 from loguru import logger  # Used for consoPORTBUFFER_SIZEle logging.
+from .responsehandler import *
 from ..frame_models import (
     WebSocketFrameEncoder,
     WebSocketFrameDecoder,
@@ -83,6 +84,9 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
         self._frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True
         )  # Initialise _frame_encoder.
+        self._response_handler: HTTPResponseHandler = HTTPResponseHandler(
+            WEBSOCKET_KEY=self._WEBSOCKET_KEY
+        )
 
         self._setup_socket()  # Setup socket.
 
@@ -95,25 +99,108 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
             random.choice(characters) for _ in range(16)
         )  # Generate a random 16 byte string.
 
-        encoded_random_key = base64.b64encode(
-            random_key
-        )  # Base 64 encoded the random string.
-
-        return encoded_random_key
+        return random_key
 
     def _setup_socket(self) -> None:
         self._client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._client_socket.setblocking(True)
 
-    def _listen_for_messages(self) -> None:
-        while self._socket_open:
-            self._handle_message()
+    def _close_socket(self) -> None:
+        # Close the socket
+        if self._socket_open:
+            logger.warning("Closing socket")
+            self._socket_open = False
+            self._client_socket.close()
+            return
 
-    def _perform_websocket_handshake(self) -> bool:
-        # Perform WebSocket handshake
+    def _send_websocket_message(
+        self,
+        payload: Optional[str] = "",
+        opcode: Optional[bytes] = 0x1,
+    ) -> None:
+        logger.debug("Sending Message")
+
+        frames = self._frame_encoder.encode_payload_to_frames(
+            payload=payload, opcode=opcode
+        )  # Encoded the given payload and opcode to WebSocket frame(s).
+
+        for frame in frames:  # For each frame created.
+            self._client_socket.send(frame)  # Send the frame to the server.
+
+        return
+
+    def _check_control_frame(self, opcode: bytes) -> None:
+        if (
+            opcode == FrameOpcodes.close
+        ):  # Check if recieved frame opcode is a connection close opcode.
+            self._close_socket()  # Close the socket connection.
+            return
+        if (
+            opcode == FrameOpcodes.ping
+        ):  # Check if recieved frame opcode is a ping opcode.
+            logger.debug(f"Received Ping from Server.")
+            self._pong()  # Send a pong frame in response.
+            return
+        if (
+            opcode == FrameOpcodes.pong
+        ):  # Check if recieved frame opcode is a pong opcode.
+            logger.success(f"Received Pong from Server.")  #
+            return
+
+    def _pong(self) -> None:
+        self._send_websocket_message(
+            opcode=FrameOpcodes.pong
+        )  # Send a pong frame using _send_websocket_message method.
+
+    def _read_recv(
+        self,
+    ) -> Any | None:
+        readable_sockets: list = select.select(
+            [self._client_socket], [], [], self._TIMEOUT
+        )[
+            0
+        ]  # Check if the socket is readable.
+
+        if (
+            self._client_socket not in readable_sockets
+        ):  # If the socket is not readable.
+            return None  # Return no data.
+
+        with self._LOCK:  # Protect access to shared resources.
+            retry_count: int = 0  # Initialise retry count.
+            MAX_RETRIES: Literal[5] = 5  # Set MAX_RETRIES to 5.
+
+            while (
+                retry_count < MAX_RETRIES and self._client_socket in readable_sockets
+            ):  # While the socket is readable and max retries has not been reached.
+                data = self._client_socket.recv(
+                    self._BUFFER_SIZE
+                )  # Read data from the socket.
+
+                if data:  # If there is data.
+                    return data  # Return the data.
+                else:  # If not.
+                    retry_count += 1  # Update the retry_count
+                    delay: int = (
+                        0.1 * retry_count
+                    ) ** 2  # Set exponentially increasing delay.
+                    logger.warning(f"No data received, retrying in {delay} seconds...")
+                    time.sleep(delay)  # Use delay.
+
+            logger.critical("Max retries reached. Unable to read data.")
+
+            return None  # Return no data.
+
+    def _perform_websocket_handshake(self, retry_count: Optional[int] = 0) -> bool:
+        retry_count = retry_count
+
+        if retry_count >= 5:
+            return False
+
         logger.debug("Performing WebSocket Handshake")
 
-        request = (
+        # Create the handshake request and encode it (utf-8).
+        handshake_request: bytes = (
             f"GET /websocket HTTP/1.1\r\n"
             f"Host: {self._HOST}:{self._PORT}\r\n"
             "Upgrade: websocket\r\n"
@@ -123,14 +210,89 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
             "\r\n"
         ).encode("utf-8")
 
-        self._client_socket.send(request)
+        self._client_socket.send(
+            handshake_request
+        )  # Send the handshake request to the server.
 
-        response = self._read_recv().decode("utf-8")
-        if "101 Switching Protocols" in response:
+        response: str = self._read_recv().decode("utf-8")  # Retrieve the response.
+
+        if self._response_handler.validate_handshake_response(
+            handshake_response=response
+        ):
             self._trigger(event="connection", socket=self._client_socket)
             return True
-        else:
-            return False
+
+        retry_count += 1
+
+        self._perform_websocket_handshake(retry_count=retry_count)
+
+    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
+        # Check the FIN bit in the first byte of the frame.
+        return (frame_in_bytes[0] & 0x80) >> 7 == 1
+
+    def _handle_message(self) -> None:
+        frame_in_bytes: bytes = b""  # Initialise frame_in_bytes.
+        final_message: str = ""  # Initialise final_message.
+
+        while True:
+            frame_data = self._read_recv()  # Read socket data.
+
+            if frame_data == None:
+                # Connection closed, or no data received.
+                break
+
+            logger.debug("Handling websocket message")
+
+            frame_in_bytes = frame_data  # set frame_in_bytes to frame_data.
+
+            if not self._is_final_frame(frame_in_bytes):
+                # This is a fragmented frame
+                self._frame_decoder.decode_websocket_message(
+                    frame_in_bytes=frame_in_bytes
+                )  # Decode the given frame.
+
+                message_payload = self._frame_decoder.payload_data.decode(
+                    "utf-8"
+                )  # Retrieve the decoded payload_data.
+
+                final_message += (
+                    message_payload  # Add the decoded message to the final message.
+                )
+            else:
+                # This is a non-fragmented frame
+                self._frame_decoder.decode_websocket_message(
+                    frame_in_bytes=frame_in_bytes
+                )  # Decode the frame.
+
+                control_opcode = (
+                    self._frame_decoder.opcode
+                )  # Retrieve the opcode (control frames can't be fragmented).
+
+                self._check_control_frame(
+                    opcode=control_opcode
+                )  # Check which opcode is present.
+
+                message_payload = self._frame_decoder.payload_data.decode(
+                    "utf-8"
+                )  # Retrieve the decoded payload_data.
+
+                final_message += (
+                    message_payload  # Add the decoded message to the final message.
+                )
+                break  # Break the loop early so no more data is read for this message.
+
+        if (
+            final_message and frame_in_bytes
+        ):  # If both the final message and frame are present.
+            frame_in_bytes = b""  # Reset the frame_in_bytes.
+
+            message_dict: dict = json.loads(
+                final_message
+            )  # Load the final message (always a dictionary).
+
+            self._trigger_event_from_message(
+                final_message=message_dict
+            )  # Trigger the event given.
 
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
         if event in self._event_handlers:  # If the event is in _event_handlers.
@@ -141,3 +303,26 @@ class ClientSocketBaseImpl:  # rework with new frame encoder and websocketframe 
                     *args,
                     **kwargs,  # Provide required positional arguments and key arguments.
                 )  # Call the handler.
+
+    def _trigger_event_from_message(self, final_message: dict) -> None:
+        final_message_keys = list(
+            final_message.keys()
+        )  # Extract the keys from the final message.
+
+        event = final_message_keys[
+            0
+        ]  # Extract the event key (will always be first key).
+
+        if not event:  # If no event was given.
+            logger.warning(
+                f"Message with no endpoint recieved: {final_message}"
+            )  # Log the error, no execption is needed here.
+            return
+
+        self._trigger(event, final_message[event])  # Trigger the event given.
+
+        return
+
+    def _listen_for_messages(self) -> None:
+        while self._socket_open:
+            self._handle_message()
