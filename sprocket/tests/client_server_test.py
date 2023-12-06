@@ -58,6 +58,6 @@ class ClientServerTests(unittest.TestCase):
 
         time.sleep(1)
 
-        self.assertEqual("big money", self.messages)
+        self.assertEqual("big money", self.messages[0])
 
         self.server.stop()
