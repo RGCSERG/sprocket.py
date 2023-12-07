@@ -31,7 +31,7 @@ __all__: Final[List[str]] = ["HTTPRequestHandler"]
 
 class HTTPRequestHandler:
     """
-    HTTPRequestHandler is responsible for handling incoming WebSocket handshake requests over HTTP.
+    HTTPRequestHandler is responsible for handling any given incoming WebSocket handshake request over HTTP.
 
     Containing methods to parse the request data, validate the WebSocket handshake, and process the incoming requests.
     """
