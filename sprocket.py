@@ -1,8 +1,8 @@
-from sprocket import ServerSocketImpl
+from sprocket import ServerSocket
 import socket
 from loguru import logger
 
-io = ServerSocketImpl()
+io = ServerSocket()
 
 
 def main(socket: socket):
