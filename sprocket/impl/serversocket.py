@@ -21,10 +21,10 @@ from typing import Callable, Final, List, Optional, Type
 from loguru import logger
 from .serversocketbase import *
 
-__all__: Final[List[str]] = ["ServerSocketImpl"]
+__all__: Final[List[str]] = ["ServerSocket"]
 
 
-class ServerSocketImpl(
+class ServerSocket(
     ServerSocketBaseImpl
 ):  # rework with new frame encoder and websocketframe class updates + comments
     """
@@ -155,7 +155,7 @@ class RoomEmitter:
     not just all or one client.
     """
 
-    def __init__(self, server_socket: ServerSocketImpl, room_users: list) -> None:
+    def __init__(self, server_socket: ServerSocket, room_users: list) -> None:
         """
         Initialiser method.
 
