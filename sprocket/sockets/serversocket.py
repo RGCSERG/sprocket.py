@@ -1,280 +1,358 @@
-# """Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
+"""Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE."""
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE."""
 
-# import socket
-# from abc import ABC, abstractmethod
-# from typing import Any, Final, List, NoReturn, Optional, Tuple
-
-
-# __all__: Final[List[str]] = ["ServerSocket"]
+import socket
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Final, List, NoReturn, Optional, Tuple, Type
 
 
-# class ServerSocket(ABC):
-#     def __init__(
-#         self,
-#         TCP_HOST: Optional[str],
-#         TCP_PORT: Optional[int],
-#         TCP_BUFFER_SIZE: Optional[int],
-#         WS_ENDPOINT: Optional[str],
-#         MAX_FRAME_SIZE: Optional[int],
-#         TIMEOUT: Optional[int],
-#         DEFAULT_HTTP_RESPONSE: Optional[bytes],
-#         WEBSOCKET_GUID: Optional[str],
-#         BACKLOG: Optional[int],
-#     ) -> None:
-#         """
-#         Abstract base class for a WebSocket server implementation that handles WebSocket connections and HTTP requests.
+__all__: Final[List[str]] = ["ServerSocket"]
 
-#         Attributes:
-#             TCP_HOST str: The hostname or IP address to which the server socket should bind.
-#             TCP_PORT int: The port number for incoming connections.
-#             TCP_BUFFER_SIZE int: Buffer size for reading data from TCP sockets.
-#             WS_ENDPOINT str: The WebSocket endpoint to handle.
-#             MAX_FRAME_SIZE int: Maximum WebSocket frame size.
-#             TIMEOUT int: Timeout value for socket operations.
-#             DEFAULT_HTTP_RESPONSE bytes: Default HTTP response for regular HTTP requests.
-#             WEBSOCKET_GUID str: Unique identifier for WebSocket connections.
-#             BACKLOG int: Number of unaccepted connections allowed before refusing new connections.
-#             _server_socket socket: Main server socket for incoming connections.
-#             _event_handlers dict: Event handlers for WebSocket events.
-#             _rooms dict: Data structure for managing WebSocket rooms or groups.
-#             _input_sockets list: List of all open socket connections.
-#             _ws_sockets list: List of WebSocket connections currently managed.
-#             _frame_decoder WebsocketFrame: Instance for decoding WebSocket frames.
-#             _frame_encoder WebSocketFrameEncoder: Instance for encoding payloads into WebSocket frames.
-#             _control_frame_types ControlFrame: Instance for WebSocket control frame types.
-#             _LOCK threading.Lock: Threading lock for synchronizing access to shared resources.
 
-#             Subclasses should provide implementations for the abstract methods to create a functional WebSocket system.
-#         """
-#         pass
+class ServerSocket(ABC):
+    """
+    Class for a WebSocket server implementation that handles WebSocket connections, messages and HTTP requests.
+    """
 
-#     @abstractmethod
-#     def _setup_socket(self) -> None:
-#         """
-#         Set up the server socket for accepting client connections.
-#         This method should handle creating and binding the server socket.
-#         """
-#         pass
+    def __init__(
+        self,
+        HOST: Optional[str] = "localhost",
+        PORT: Optional[int] = 1000,
+        BUFFER_SIZE: Optional[int] = 8192,
+        WS_ENDPOINT: Optional[str] = "/websocket",
+        MAX_FRAME_SIZE: Optional[int] = 125,
+        TIMEOUT: Optional[int] = 5,
+        BACKLOG: Optional[int] = 5,
+    ) -> None:
+        """
+        Args:
+            HOST str: The hostname or IP address to which the server socket should bind.
+            PORT int: The port number for incoming connections.
+            BUFFER_SIZE int: Buffer size for reading data from TCP sockets.
+            WS_ENDPOINT str: The WebSocket endpoint to handle.
+            MAX_FRAME_SIZE int: Maximum WebSocket frame size.
+            TIMEOUT int: Timeout value for socket operations.
+            BACKLOG int: Number of unaccepted connections allowed before refusing new connections.
 
-#     @abstractmethod
-#     def _generate_random_websocket_guid(self) -> str:
-#         """
-#         Generate a random WebSocket GUID.
-#         This method should generate and return a random WebSocket GUID.
-#         """
-#         pass
+        _Args:
+            _LOCK threading.Lock: Threading lock for synchronizing access to shared resources.
+            _server_socket socket: Main server socket for incoming connections.
+            _rooms dict: Data structure for managing WebSocket rooms or groups.
+            _event_handlers dict: Event handlers for WebSocket events.
+            _active_sockets list: List of all open socket connections.
+            _websocket_sockets list: List of WebSocket connections currently managed.
+            _request_handler HTTPRequestHandler: Class for handling HTTP requests.
+            _frame_decoder WebsocketFrame: Class for decoding WebSocket frames.
+            _frame_encoder WebSocketFrameEncoder: Class for encoding any given payload into WebSocket frame(s).
 
-#     @abstractmethod
-#     def _listen_for_messages(self) -> NoReturn:
-#         """
-#         Listen for incoming messages from clients and handle them.
-#         This method should manage the main loop for handling incoming client connections
-#         and their messages.
-#         """
-#         pass
+            Subclasses should provide implementations for the abstract methods to create a functional WebSocket system.
+        """
 
-#     @abstractmethod
-#     def _handle_new_connection(self) -> None:
-#         """
-#         Handle a new incoming client connection.
-#         This method should be responsible for accepting and handling new client connections.
-#         """
-#         pass
+    @abstractmethod
+    def _generate_random_websocket_guid(self) -> str:
+        """
+        Generates a random WebSocket GUID, using .join and random.choice
 
-#     @abstractmethod
-#     def _create_new_client_thread(self, client_socket: socket) -> None:
-#         """
-#         Create a new thread to handle a client's connection.
-#         This method should create a new thread to handle the communication with a specific client.
+        Returns:
+            formatted_guid str: fully formatted WebSocket GUID string
+        """
 
-#         Args:
-#             client_socket socket: The client socket to be handled.
-#         """
-#         pass
+    @abstractmethod
+    def _remove_socket_from_lists(self, socket: socket) -> None:
+        """
+        Removes any given socket from all active socket lists,
+        so that the socket is no longer read from.
+        """
 
-#     @abstractmethod
-#     def _handle_request(self, client_socket: socket) -> None:
-#         """
-#         Handle an incoming HTTP request from a client.
-#         This method should parse and process incoming HTTP requests from clients.
+    @abstractmethod
+    def _send_websocket_message(
+        self,
+        socket: socket,
+        payload: Optional[str] = "",
+        opcode: Optional[bytes] = 0x1,
+    ) -> None:
+        """
+        Sends a WebSocket message to a specific client,
+        identified by the provided socket argument.
 
-#         Args:
-#             client_socket socket: The client socket containing the HTTP request.
-#         """
-#         pass
+        This method is typically used to send control frames.
 
-#     @abstractmethod
-#     def _handle_ws_handshake_request(
-#         self, client_socket: socket, headers_map: dict
-#     ) -> None:
-#         """
-#         Handle a WebSocket handshake request from a client.
-#         This method should handle WebSocket handshake requests and establish WebSocket connections.
+        Args:
+            socket socket: The client socket to send the message to.
+            message Optional[str]: The message to send to the client.
+            opcode Optional[bytes]: The WebSocket frame opcode.
+        """
 
-#         Args:
-#             client_socket socket: The client socket with the WebSocket handshake request.
-#             headers_map dict: The headers from the WebSocket handshake request.
-#         """
-#         pass
+    @abstractmethod
+    def _close_socket(self, socket: socket) -> None:
+        """
+        Closes a client socket and cleans up any associated resources.
 
-#     @abstractmethod
-#     def _generate_sec_websocket_accept(self, sec_websocket_key: str) -> bytes:
-#         """
-#         Generate the 'Sec-WebSocket-Accept' value for a WebSocket handshake.
-#         This method should generate and return the value for the 'Sec-WebSocket-Accept' header.
+        Args:
+            client_socket socket: The client socket to be closed.
+        """
 
-#         Args:
-#             sec_websocket_key str: The 'Sec-WebSocket-Key' from the client's request.
+    @abstractmethod
+    def _setup_socket(self) -> None:
+        """
+        Sets up the server socket for accepting client connections.
+        """
 
-#         Returns:
-#             bytes: The 'Sec-WebSocket-Accept' value.
-#         """
-#         pass
+    @abstractmethod
+    def _create_sec_accept_key(self, sec_websocket_key: str) -> bytes:
+        """
+        Creates the 'Sec-WebSocket-Accept' header value for a WebSocket handshake.
 
-#     @abstractmethod
-#     def _is_valid_ws_handshake_request(
-#         self, method: str, target: str, http_version: str, headers_map: dict
-#     ) -> bool:
-#         """
-#         Check if an HTTP request is a valid WebSocket handshake request.
-#         This method should determine if an incoming HTTP request is a valid WebSocket handshake request.
+        Args:
+            sec_websocket_key str: The 'Sec-WebSocket-Key' from the client's request.
 
-#         Args:
-#             method str: The HTTP method.
-#             target str: The request target.
-#             http_version str: The HTTP version.
-#             headers_map dict: The headers from the request.
+        Returns:
+            encoded_key bytes: The 'Sec-WebSocket-Accept' value.
+        """
 
-#         Returns:
-#             bool: True if the request is a valid WebSocket handshake request, False otherwise.
-#         """
-#         pass
+    @abstractmethod
+    def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
+        """
+        Triggers all handlers linked to the given event,
+        passing in any given positional / key word argument(s) to the function.
 
-#     @abstractmethod
-#     def _parse_request(self, request: str) -> Tuple[str, str, str, dict]:
-#         """
-#         Parse an incoming HTTP request.
-#         This method should parse and extract information from an incoming HTTP request.
+        Args:
+            event str: The name of the event to be triggered.
+            *args tuple: Takes in all positional arguments and adds them to a tuple.
+            **kwargs dict[str, Any]: Takes in all key word values and assigns the value to a keyword in a dictionary.
+        """
 
-#         Args:
-#             request str: The HTTP request as a string.
+    @abstractmethod
+    def _trigger_event_from_message(self, final_message: dict) -> None:
+        """
+        Takes the final WebSocket message converts it to a dictionary and takes the keyword value
+        (the event name) and triggers the given event.
 
-#         Returns:
-#             Tuple[str, str, str, dict]: A tuple containing the HTTP method, request target,
-#             HTTP version, and a dictionary of headers.
-#         """
-#         pass
+        All WebSocket messages recieved from a valid client should be dictionaries.
 
-#     @abstractmethod
-#     def _check_control_frame(self, opcode: bytes, client_socket: socket) -> None:
-#         """
-#         Check if a WebSocket frame is a control frame and handle it.
-#         This method should inspect a WebSocket frame's opcode to identify control frames and handle them accordingly.
+        Args:
+            final_message str: The final decoded message recieved from a client.
+        """
 
-#         Args:
-#             opcode bytes: The opcode of the WebSocket frame.
-#             client_socket socket: The client socket that sent the frame.
-#         """
-#         pass
+    @abstractmethod
+    def _handle_handshake(self, socket: socket, headers: dict) -> None:
+        """
+        Handles a WebSocket handshake request from a client, and establishes WebSocket connections.
 
-#     @abstractmethod
-#     def _pong(self, client_socket: socket) -> None:
-#         """
-#         Send a WebSocket Pong frame to a client.
-#         This method should send a WebSocket Pong frame to acknowledge a Ping frame from the client.
+        Args:
+            socket socket: The client socket with the WebSocket handshake request.
+            headers dict: The headers from the WebSocket handshake request.
+        """
 
-#         Args:
-#             client_socket socket: The client socket to send the Pong frame to.
-#         """
-#         pass
+    @abstractmethod
+    def _read_recv(self, socket: socket) -> Any | None:
+        """
+        Reads data from the client socket, by waiting for incoming messages,
+        and retrying if errors occur.
 
-#     @abstractmethod
-#     def _trigger(self, event: str, *args: Tuple, **kwargs: dict[str, Any]) -> None:
-#         """
-#         Trigger event handlers for a specific event.
-#         This method should trigger event handlers associated with a particular event.
+        Args:
+            socket socket: The client socket for data to be read from.
 
-#         Args:
-#             event str: The event to trigger.
-#             args Tuple: Additional arguments to pass to the event handlers.
-#             kwargs dict: Additional keyword arguments to pass to the event handlers.
-#         """
-#         pass
+        Returns:
+            data bytes: The data read from the socket,
+            or None.
+        """
 
-#     @abstractmethod
-#     def _handle_websocket_message(self, client_socket: socket) -> None:
-#         """
-#         Handle incoming WebSocket messages from a client.
-#         This method should process and handle incoming WebSocket messages received from a client.
+    @abstractmethod
+    def _receive_http_request(self, socket: socket) -> str:
+        """
+        Reads an incoming HTTP request from a client,
+        and decodes + constructs it to form a full HTTP request.
 
-#         Args:
-#             client_socket socket: The client socket with the WebSocket messages.
-#         """
-#         pass
+        Args:
+            socket socket: The client socket from which the HTTP request is coming from.
 
-#     @abstractmethod
-#     def _trigger_message_event(self, message: str, client_socket: socket) -> None:
-#         """
-#         Trigger an event for an incoming WebSocket message.
-#         This method should trigger a specific event for an incoming WebSocket message.
+        Returns:
+            decoded_request_data str: The full HTTP request in str format.
+        """
 
-#         Args:
-#             message (str): The WebSocket message received.
-#             client_socket socket: The client socket that sent the message.
-#         """
-#         pass
+    @abstractmethod
+    def _handle_request(self, socket: socket) -> None:
+        """
+        The main handler method for any given HTTP request, utilises the _receive_http_request method,
+        and the instance of the _request_handler.
 
-#     @abstractmethod
-#     def _is_final_frame(self, data_in_bytes: bytes) -> bool:
-#         """
-#         Check if a WebSocket frame is the final frame of a message.
-#         This method should determine whether a WebSocket frame is the final frame of a message.
+        Args:
+            socket socket: The client socket sending the request.
+        """
 
-#         Args:
-#             data_in_bytes bytes: The WebSocket frame data.
+    @abstractmethod
+    def _pong(self, socket: socket) -> None:
+        """
+        Sends a pong frame to a client socket.
 
-#         Returns:
-#             bool: True if it's the final frame, False otherwise.
-#         """
-#         pass
+        Args:
+            socket socket: The client socket for the pong frame to be sent to.
+        """
 
-#     @abstractmethod
-#     def _read_recv(self, client_socket: socket) -> bytes:
-#         """
-#         Read data from the client socket.
-#         This method should read data from the client socket, waiting for incoming messages.
+    @abstractmethod
+    def _check_control_frame(self, opcode: bytes, socket: socket) -> None:
+        """
+        Inspects a WebSocket frame's opcode to identify control frames and handles them accordingly.
 
-#         Args:
-#             client_socket socket: The client socket to read data from.
+        Args:
+            opcode bytes: The opcode of the WebSocket frame.
+            socket socket: The client socket that sent the frame.
+        """
 
-#         Returns:
-#             bytes: The data read from the socket.
-#         """
-#         pass
+    @abstractmethod
+    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
+        """
+        Determines whether a WebSocket frame is the final frame of a message.
 
-#     @abstractmethod
-#     def _close_socket(self, client_socket: socket) -> None:
-#         """
-#         Close a client socket.
-#         This method should close a client socket and clean up any associated resources.
+        Args:
+            frame_in_bytes bytes: The WebSocket frame data.
 
-#         Args:
-#             client_socket socket: The client socket to close.
-#         """
-#         pass
+        Returns:
+            bool: True if it's the final frame, otherwise False.
+        """
+
+    @abstractmethod
+    def _handle_message(self, socket: socket) -> None:
+        """
+        Processes and handles incoming WebSocket messages received from a client socket.
+
+        Args:
+            socket socket: The client socket with the WebSocket messages.
+        """
+
+    @abstractmethod
+    def _create_new_client_thread(self, client_socket: socket) -> None:
+        """
+        Creats a new thread to handle communications with a specific client.
+
+        Args:
+            client_socket socket: The client socket to be handled.
+        """
+
+    @abstractmethod
+    def _handle_connection(self) -> None:
+        """
+        Used for accepting and handling new client connections to the server.
+        """
+
+    @abstractmethod
+    def _listen_for_messages(self) -> None:
+        """
+        Used for managing the main loop which handles incoming client connections
+        and their messages.
+        """
+
+    @abstractmethod
+    def start(self) -> None:
+        """
+        Starts the WebSocket server and listens for incoming connections.
+        This method listens for incoming connections on the specified host and port,
+        and starts a separate thread to handle incoming messages from each client instance.
+        """
+
+    @abstractmethod
+    def leave_room(self, socket: socket, room_name: Optional[str] = "") -> None:
+        """
+        Removes a client (identified by their socket) from a specified chat room.
+
+        Args:
+            socket socket: The client socket to be removed from the chat room.
+            room_name str: The name of the chat room to leave.
+        """
+
+    @abstractmethod
+    def stop(self):
+        """
+        Shuts down the server socket, without forcing clients to close connection.
+        """
+
+    @abstractmethod
+    def join_room(self, room_name: str, socket: socket) -> None:
+        """
+        Adds a client (identified by their socket) to a specified chat room.
+
+        Args:
+            socket socket: The client socket to be added to the chat room.
+            room_name str: The name of the chat room to join.
+        """
+
+    @abstractmethod
+    def emit(
+        self, event: str, socket: socket, payload: (str | bytes | dict | None) = ""
+    ) -> None:
+        """
+        Emits a message to any given client socket,
+        converting the event and payload into a keyword: value dictionary.
+
+        Args:
+            event str: The given event for the WebSocket message to be send across.
+            socket socket: The client socket to which the message is to be sent too.
+            payload (str | bytes | dict | None): The payload to be sent with the event.
+        """
+
+    @abstractmethod
+    def broadcast_message(
+        self, event: Optional[str] = "", payload: (str | bytes | dict | None) = ""
+    ) -> None:
+        """
+        Broadcasts a message to all WebSocket clients currently connected to the server.
+
+        Args:
+            payload Optional[str]: The message to broadcast to clients.
+        """
+
+    @abstractmethod
+    def ping(self, socket: socket) -> None:
+        """
+        Sends a WebSocket Ping frame to a specific client, prompting a Pong response.
+
+        Args:
+            socket socket: The client socket to send the Ping frame to.
+        """
+
+    @abstractmethod
+    def on(self, event: str, handler: Callable) -> None:
+        """
+        Registers custom event handlers to respond to specific events.
+
+        Args:
+            event str: The event to listen for.
+            handler Callable: The function to be executed when the event occurs.
+        """
+
+    @abstractmethod
+    def to(
+        self, room_name: str
+    ) -> Type["RoomEmitter"]:  # Type is used here to avoid undefined errors.
+        """
+        Emits a message to a specific room, with use of the RoomEmitter class defined below.
+
+        Args:
+            room_name str: The specific room to be emitted to.
+
+        Returns:
+            RoomEmitter: Returns an instance of the room emitter class.
+        """
+
+
+class RoomEmitter(ABC):
+    """
+    Allows for messages to be emitted to a particular room,
+    not just all or one client.
+    """
