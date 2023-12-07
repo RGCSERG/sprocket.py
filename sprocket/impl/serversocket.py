@@ -16,7 +16,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import socket, threading
+import socket, threading, json
 from typing import Callable, Final, List, Optional, Type
 from loguru import logger
 from .serversocketbase import *
@@ -27,6 +27,10 @@ __all__: Final[List[str]] = ["ServerSocketImpl"]
 class ServerSocketImpl(
     ServerSocketBaseImpl
 ):  # rework with new frame encoder and websocketframe class updates + comments
+    """
+    Class for a WebSocket server implementation that handles WebSocket connections, messages and HTTP requests.
+    """
+
     def __init__(
         self,
         HOST: Optional[str] = "localhost",
@@ -48,11 +52,6 @@ class ServerSocketImpl(
         )
 
     def start(self) -> None:
-        """
-        Starts the WebSocket server and listens for incoming connections.
-        This method listens for incoming connections on the specified host and port,
-        and starts a separate thread to handle incoming messages from each client instance.
-        """
         self._server_socket.listen(
             self._BACKLOG
         )  # Start listening proccess, specifiying maxiumum queue.
@@ -65,14 +64,6 @@ class ServerSocketImpl(
         listen_thread.start()  # Start listening thread.
 
     def leave_room(self, socket: socket, room_name: Optional[str] = "") -> None:
-        """
-        Remove a client from a specific chat room.
-        This method removes a client (identified by their socket) from a specified chat room.
-
-        Args:
-            socket socket: The client socket to be removed from the chat room.
-            room_name str: The name of the chat room to leave.
-        """
         if (
             room_name in self._rooms and socket in self._rooms[room_name]
         ):  # If room name provided, and the socket in that room.
@@ -94,39 +85,37 @@ class ServerSocketImpl(
                 )  # Remove the socket from the room.
 
     def stop(self):
-        """
-        Shuts down the server socket, without forcing clients to close connection.
-        """
         for socket in self._active_sockets:  # For each active socket.
             self._close_socket(socket=socket)  # Send a control close connection frame.
         self.main_thread = False  # Terminate the server listening thread.
 
     def join_room(self, room_name: str, socket: socket) -> None:
-        """
-        Add a client to a specific chat room.
-        This method adds a client (identified by their socket) to a specified chat room.
-
-        Args:
-            socket socket: The client socket to be added to the chat room.
-            room_name str: The name of the chat room to join.
-        """
         if room_name not in self._rooms:  # If the room name does not exist.
             self._rooms[room_name] = []  # Create the room with the provided name.
         self._rooms[room_name].append(socket)  # Append the client socket to the room.
 
+    def emit(
+        self, event: str, socket: socket, payload: (str | bytes | dict | None) = ""
+    ) -> None:
+        json_data: dict = {event: payload}  # Set up the json_data.
+
+        payload: str = json.dumps(json_data)  # Dump the json_data into str format.
+
+        frames = self._frame_encoder.encode_payload_to_frames(
+            payload=payload
+        )  # Encode the payload into WebSocket frames.
+
+        for frame in frames:  # For each frame created.
+            socket.send(frame)  # Send it to the given socket.
+
+        return
+
     def broadcast_message(
         self, event: Optional[str] = "", payload: (str | bytes | dict | None) = ""
     ) -> None:
-        """
-        Broadcast a message to all connected WebSocket clients.
-        This method sends a message to all WebSocket clients currently connected to the server.
-
-        Args:
-            payload Optional[str]: The message to broadcast to clients.
-        """
         for socket in self._ws_sockets:  # For each active socket.
             try:
-                self._emit(
+                self.emit(
                     event=event, socket=socket, payload=payload
                 )  # Emit the message.
             except Exception as e:
@@ -134,26 +123,11 @@ class ServerSocketImpl(
                 logger.warning(f"Error broadcasting message to client: {e}")
 
     def ping(self, socket: socket) -> None:
-        """
-        Send a WebSocket Ping frame to a specific client.
-        This method sends a WebSocket Ping frame to a specific client, prompting a Pong response.
-
-        Args:
-            socket socket: The client socket to send the Ping frame to.
-        """
         self._send_websocket_message(
             socket=socket, opcode=self.control_frame_types.ping
         )  # Send a ping frame to the client socket.
 
     def on(self, event: str, handler: Callable) -> None:
-        """
-        Register an event handler for a specific event.
-        This method allows registering custom event handlers to respond to specific events.
-
-        Args:
-            event str: The event to listen for.
-            handler Callable: The function to be executed when the event occurs.
-        """
         if event not in self._event_handlers:  # If event not found.
             self._event_handlers[
                 event
@@ -165,15 +139,6 @@ class ServerSocketImpl(
     def to(
         self, room_name: str
     ) -> Type["RoomEmitter"]:  # Type is used here to avoid undefined errors.
-        """
-        Emits a message to a specific room, with use of the RoomEmitter class defined below.
-
-        Args:
-            room_name str: The specific room to be emitted to.
-
-        Returns:
-            RoomEmitter: Returns an instance of the room emitter class.
-        """
         if room_name not in self._rooms:  # Implement some error handling logic.
             self._rooms[room_name] = []  # Not a viable solution.
 
@@ -203,16 +168,16 @@ class RoomEmitter:
 
     def emit(self, event: str, payload: (str | bytes | dict | None)) -> None:
         """
-        Method used for emitting message to specific room, with use of the private _emit message,
+        Method used for emitting message to specific room, with use of the private emit message,
         with respect to the current instance of the ServerSocketImpl instance.
 
         Args:
             event str: The event to be trigger by the sent message.
             payload (str | bytes | dict | None): The payload to be sent with the WebSocket message,
             the specific type of the payload doesn't matter (too much) as will be automatically converted
-            to str by the _emit function.
+            to str by the emit function.
         """
         for socket in self._room_users:  # Iterates through each socket in the room.
-            self._server_socket._emit(
+            self._server_socket.emit(
                 event=event, socket=socket, payload=payload
             )  # For each socket in the room, a message is directly sent.
