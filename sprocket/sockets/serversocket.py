@@ -59,8 +59,6 @@ class ServerSocket(ABC):
             _request_handler HTTPRequestHandler: Class for handling HTTP requests.
             _frame_decoder WebsocketFrame: Class for decoding WebSocket frames.
             _frame_encoder WebSocketFrameEncoder: Class for encoding any given payload into WebSocket frame(s).
-
-            Subclasses should provide implementations for the abstract methods to create a functional WebSocket system.
         """
 
     @abstractmethod
