@@ -27,6 +27,7 @@ from typing import (
     Optional,
 )  # Used for type annotations and decloration.
 from loguru import logger  # Used for console logging.
+from ..sockets import ServerSocket
 from ..frame_models import (
     WebSocketFrameEncoder,
     WebSocketFrameDecoder,
@@ -36,15 +37,18 @@ from ..functions import check_port, check_frame_size  # Import used functions.
 from ..exceptions import (
     TCPPortException,
     FrameSizeException,
-    SecWebSocketKeyException,
-)  # Import used exceptions.
+)
 from .requesthandler import *
 
 
 __all__: Final[List[str]] = ["ServerSocketBaseImpl"]
 
 
-class ServerSocketBaseImpl:
+class ServerSocketBaseImpl(ServerSocket):
+    """
+    Class for a WebSocket server implementation that handles WebSocket connections, messages and HTTP requests.
+    """
+
     def __init__(
         self,
         HOST: Optional[str] = "localhost",
@@ -140,16 +144,6 @@ class ServerSocketBaseImpl:
         payload: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
     ) -> None:
-        # """
-        # Send a WebSocket message to a specific client.
-        # This method sends a WebSocket message to a specific client identified by the provided socket.
-
-        # Args:
-        #     socket socket: The client socket to send the message to.
-        #     message Optional[str]: The message to send to the client.
-        #     event Optional[str]: An optional event identifier for the message.
-        #     opcode Optional[bytes]: The WebSocket frame opcode.
-        # """
         logger.debug("Sending Message")
 
         frames = self._frame_encoder.encode_payload_to_frames(
@@ -240,22 +234,6 @@ class ServerSocketBaseImpl:
             return
 
         self._trigger(event, final_message[event])  # Trigger the event given.
-
-        return
-
-    def _emit(
-        self, event: str, socket: socket, payload: (str | bytes | dict | None) = ""
-    ) -> None:
-        json_data: dict = {event: payload}  # Set up the json_data.
-
-        payload: str = json.dumps(json_data)  # Dump the json_data into str format.
-
-        frames = self._frame_encoder.encode_payload_to_frames(
-            payload=payload
-        )  # Encode the payload into WebSocket frames.
-
-        for frame in frames:  # For each frame created.
-            socket.send(frame)  # Send it to the given socket.
 
         return
 
