@@ -1,5 +1,5 @@
 """
-Python libary for WebSocket applications.
+Python libary for WebSocket messaging applications.
 """
 
 from datetime import datetime
@@ -8,7 +8,6 @@ from .exceptions import *
 from .frame_models import *
 from .functions import *
 from .impl import *
-from .sockets import *
 
 __version__ = "0.0.0"
 __author__ = "RGCSERG"
