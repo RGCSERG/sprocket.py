@@ -36,12 +36,13 @@ class HTTPRequestHandler:
     Containing methods to parse the request data, validate the WebSocket handshake, and process the incoming requests.
     """
 
-    def __init__(self, WS_ENDPOINT: str) -> None:
+    def __init__(self, WS_ENDPOINT: str, HOST: str, PORT: int) -> None:
         """
         Args:
             WS_ENDPOINT str: The endpoint to which WebSocket hanshake Requests should be made.
         """
         self.WS_ENDPOINT: str = WS_ENDPOINT  # Set WS_ENDPOINT.
+        self.HOST_DOMAIN: str = f"{HOST}:{PORT}"
 
         self.request_data: str = ""  # Initialise request_data.
         self.method: str = ""  # Initialise method.
@@ -72,7 +73,7 @@ class HTTPRequestHandler:
     def _parse_headers(self, headers: list[str]) -> dict:
         """
         Parses the headers of the request by iterating through the provided line list,
-        then individually parsing each lines to create a dictionary containing the headers' key-value pairs.
+        then individually parses each line into a dictionary containing the headers' key-value pairs.
 
         Args:
             headers list[str]: All trailing lines after index 0.
@@ -135,6 +136,7 @@ class HTTPRequestHandler:
             == "websocket"  # Check for upgrade header, and validate its value.
             and headers.get("connection", "")
             == "Upgrade"  # Check for connection header, and validate its value.
+            and headers.get("host", "") == self.HOST_DOMAIN  # CORS validation.
             and "sec-websocket-key"
             in headers  # Check there is a valid sec-websocket-key value.
         )
