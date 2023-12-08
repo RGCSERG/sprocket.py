@@ -16,7 +16,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import socket, threading, json
+import socket, threading, json, select
 from typing import Callable, Final, List, Optional, Type
 from loguru import logger
 from .serversocketbase import *
@@ -99,23 +99,36 @@ class ServerSocket(
     def emit(
         self, event: str, socket: socket, payload: (str | bytes | dict | None) = ""
     ) -> None:
-        json_data: dict = {event: payload}  # Set up the json_data.
+        try:
+            writeable_socket = select.select([], [socket], [], self._TIMEOUT)[0][
+                0
+            ]  # Check which sockets are writeable.
+            json_data: dict = {event: payload}  # Set up the json_data.
 
-        payload: str = json.dumps(json_data)  # Dump the json_data into str format.
+            payload: str = json.dumps(json_data)  # Dump the json_data into str format.
 
-        frames = self._frame_encoder.encode_payload_to_frames(
-            payload=payload
-        )  # Encode the payload into WebSocket frames.
+            frames = self._frame_encoder.encode_payload_to_frames(
+                payload=payload
+            )  # Encode the payload into WebSocket frames.
 
-        for frame in frames:  # For each frame created.
-            socket.send(frame)  # Send it to the given socket.
+            for frame in frames:  # For each frame created.
+                writeable_socket.send(frame)  # Send it to the given socket.
 
-        return
+            return
+        except IndexError:
+            logger.warning(f"Socket not writeabe: {socket}")
+            return
 
     def broadcast_message(
         self, event: Optional[str] = "", payload: (str | bytes | dict | None) = ""
     ) -> None:
-        for socket in self._ws_sockets:  # For each active socket.
+        writeable_sockets = select.select(
+            [], self._websocket_sockets, [], self._TIMEOUT
+        )[
+            0
+        ]  # Check which sockets are writeable.
+
+        for socket in writeable_sockets:  # For each active socket.
             try:
                 self.emit(
                     event=event, socket=socket, payload=payload
@@ -148,7 +161,9 @@ class ServerSocket(
             room_name
         ]  # Set list of sockets to list room_users.
 
-        return RoomEmitter(server_socket=self, room_users=room_users)
+        return RoomEmitter(
+            server_socket=self, room_users=room_users, TIMEOUT=self._TIMEOUT
+        )
 
 
 class RoomEmitter:
@@ -157,7 +172,9 @@ class RoomEmitter:
     not just all or one client.
     """
 
-    def __init__(self, server_socket: ServerSocket, room_users: list) -> None:
+    def __init__(
+        self, server_socket: ServerSocket, room_users: list, TIMEOUT: int
+    ) -> None:
         """
         Initialiser method.
 
@@ -165,6 +182,7 @@ class RoomEmitter:
             server_socket ServerSocketImpl: The current instance of the server.
             room list: The list of sockets in the specified room.
         """
+        self._TIMEOUT = TIMEOUT
         self._server_socket = server_socket  # Initialise instance of the server.
         self._room_users: list = room_users  # Initialise room's socket list.
 
@@ -179,7 +197,11 @@ class RoomEmitter:
             the specific type of the payload doesn't matter (too much) as will be automatically converted
             to str by the emit function.
         """
-        for socket in self._room_users:  # Iterates through each socket in the room.
+        writeable_sockets = select.select([], self._room_users, [], self._TIMEOUT)[
+            0
+        ]  # Check which sockets are writeable.
+
+        for socket in writeable_sockets:  # Iterates through each socket in the room.
             self._server_socket.emit(
                 event=event, socket=socket, payload=payload
             )  # For each socket in the room, a message is directly sent.
