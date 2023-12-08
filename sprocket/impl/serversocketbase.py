@@ -27,7 +27,7 @@ from typing import (
     Optional,
 )  # Used for type annotations and decloration.
 from loguru import logger  # Used for console logging.
-from ..sockets import ServerSocket
+from ..sockets import ServerSocket  # Import abstract class.
 from ..frame_models import (
     WebSocketFrameEncoder,
     WebSocketFrameDecoder,
@@ -37,8 +37,8 @@ from ..functions import check_port, check_frame_size  # Import used functions.
 from ..exceptions import (
     TCPPortException,
     FrameSizeException,
-)
-from .requesthandler import *
+)  # Import used exceptions.
+from .requesthandler import *  # Import RequestHandler.
 
 
 __all__: Final[List[str]] = ["ServerSocketBaseImpl"]
@@ -80,9 +80,7 @@ class ServerSocketBaseImpl(ServerSocket):
         self._WS_ENDPOINT: str = WS_ENDPOINT  # WebSocket connection route.
         self._TIMEOUT: int = TIMEOUT  # Set select socket timeout.
         self._BACKLOG: int = BACKLOG  # Set server backlog.
-        self._WEBSOCKET_GUID: str = (
-            self._generate_random_websocket_guid()
-        )  # Generate a random WebSocket GUID for each instance.
+        self._WEBSOCKET_GUID: str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"  # Sets the GUID to the GUID defined in RFC6455
         self._LOCK = threading.Lock()  # Protect access to shared resources.
         # ---------------------- #
         self._rooms: Dict[str, list] = {}  # Initialise _rooms.
@@ -103,28 +101,7 @@ class ServerSocketBaseImpl(ServerSocket):
 
         self._setup_socket()  # Setup socket.
 
-    # Private methods
-
-    @staticmethod
-    def _generate_random_websocket_guid() -> str:
-        # Characters that can be used in the GUID.
-        characters: str = "0123456789ABCDEF"
-
-        # Generate a random 32-character string.
-        random_guid: str = "".join(random.choice(characters) for _ in range(32))
-
-        # Format it as a WebSocket GUID.
-        formatted_guid: str = "-".join(
-            [
-                random_guid[:8],
-                random_guid[8:12],
-                random_guid[12:16],
-                random_guid[16:20],
-                random_guid[20:],
-            ]
-        )
-
-        return formatted_guid
+    # Private methods.
 
     def _remove_socket_from_lists(self, socket: socket) -> None:
         if (
