@@ -90,7 +90,7 @@ class ServerSocketBaseImpl(ServerSocket):
         self._active_sockets: list = []  # Initialise _active_sockets.
         self._websocket_sockets: list = []  # Initialise websocket sockets.
         self._request_handler: HTTPRequestHandler = HTTPRequestHandler(
-            WS_ENDPOINT=WS_ENDPOINT
+            WS_ENDPOINT=WS_ENDPOINT, HOST=HOST, PORT=PORT
         )  # Initialise _request_handler.
         self._frame_decoder: WebSocketFrameDecoder = WebSocketFrameDecoder(
             status=False
@@ -123,14 +123,20 @@ class ServerSocketBaseImpl(ServerSocket):
     ) -> None:
         logger.debug("Sending Message")
 
-        frames = self._frame_encoder.encode_payload_to_frames(
-            payload=payload, opcode=opcode
-        )  # Encoded the given payload and opcode to WebSocket frame(s).
+        try:
+            writeable_socket = select.select([], [socket], [], self._TIMEOUT)[0][0]
 
-        for frame in frames:  # For each frame created.
-            socket.send(frame)  # Send the frame to the provided socket.
+            frames = self._frame_encoder.encode_payload_to_frames(
+                payload=payload, opcode=opcode
+            )  # Encoded the given payload and opcode to WebSocket frame(s).
 
-        return
+            for frame in frames:  # For each frame created.
+                writeable_socket.send(frame)  # Send the frame to the provided socket.
+
+            return
+        except IndexError:
+            logger.warning(f"Socket not writeabe: {socket}")
+            return
 
     def _close_socket(self, socket: socket) -> None:
         with self._LOCK:  # Protect access to shared resources.
@@ -422,7 +428,7 @@ class ServerSocketBaseImpl(ServerSocket):
     def _create_new_client_thread(self, client_socket: socket) -> None:
         try:
             readable_sockets: list = select.select(
-                self._active_sockets, self._websocket_sockets, [], self._TIMEOUT
+                self._active_sockets, [], [], self._TIMEOUT
             )[
                 0
             ]  # Check if the socket is readable.
