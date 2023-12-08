@@ -43,14 +43,15 @@ class ServerSocket(ABC):
         Args:
             HOST str: The hostname or IP address to which the server socket should bind.
             PORT int: The port number for incoming connections.
-            BUFFER_SIZE int: Buffer size for reading data from TCP sockets.
+            BUFFER_SIZE int: Buffer size for reading data from sockets.
             WS_ENDPOINT str: The WebSocket endpoint to handle.
             MAX_FRAME_SIZE int: Maximum WebSocket frame size.
             TIMEOUT int: Timeout value for socket operations.
             BACKLOG int: Number of unaccepted connections allowed before refusing new connections.
 
         _Args:
-            _LOCK threading.Lock: Threading lock for synchronizing access to shared resources.
+            _WEBSOCKET_GUID str: Set to 258EAFA5-E914-47DA-95CA-C5AB0DC85B11 - The specific GUID for websocket servers as defined in RFC6455.
+            _LOCK threading.Lock: Threading lock for synchronising access to shared resources.
             _server_socket socket: Main server socket for incoming connections.
             _rooms dict: Data structure for managing WebSocket rooms or groups.
             _event_handlers dict: Event handlers for WebSocket events.
@@ -59,15 +60,6 @@ class ServerSocket(ABC):
             _request_handler HTTPRequestHandler: Class for handling HTTP requests.
             _frame_decoder WebsocketFrame: Class for decoding WebSocket frames.
             _frame_encoder WebSocketFrameEncoder: Class for encoding any given payload into WebSocket frame(s).
-        """
-
-    @abstractmethod
-    def _generate_random_websocket_guid(self) -> str:
-        """
-        Generates a random WebSocket GUID, using .join and random.choice
-
-        Returns:
-            formatted_guid str: fully formatted WebSocket GUID string
         """
 
     @abstractmethod
@@ -115,6 +107,8 @@ class ServerSocket(ABC):
     def _create_sec_accept_key(self, sec_websocket_key: str) -> bytes:
         """
         Creates the 'Sec-WebSocket-Accept' header value for a WebSocket handshake.
+        This is done by taking the base64 encoded sha1 hash of the concatenation of the Sec-WebSocket-Key nonce,
+        and the GUID str (ignoring all leading and trailing whitespace).
 
         Args:
             sec_websocket_key str: The 'Sec-WebSocket-Key' from the client's request.
