@@ -51,6 +51,8 @@ class ServerSocket(
             BACKLOG=BACKLOG,
         )
 
+    # Public methods.
+
     def start(self) -> None:
         self._server_socket.listen(
             self._BACKLOG
