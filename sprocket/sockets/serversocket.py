@@ -121,7 +121,7 @@ class ServerSocket(ABC):
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
         """
         Triggers all handlers linked to the given event,
-        passing in any given positional / key word argument(s) to the function.
+        passing in any given positional / keyword argument(s) to the function.
 
         Args:
             event str: The name of the event to be triggered.
@@ -135,10 +135,10 @@ class ServerSocket(ABC):
         Takes the final WebSocket message converts it to a dictionary and takes the keyword value
         (the event name) and triggers the given event.
 
-        All WebSocket messages recieved from a valid client should be dictionaries.
+        All WebSocket messages received from a valid client should be dictionaries.
 
         Args:
-            final_message str: The final decoded message recieved from a client.
+            final_message str: The final decoded message received from a client.
         """
 
     @abstractmethod
