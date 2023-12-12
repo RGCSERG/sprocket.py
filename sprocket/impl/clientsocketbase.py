@@ -192,7 +192,9 @@ class ClientSocketBaseImpl:
 
             return None  # Return no data.
 
-    def _perform_websocket_handshake(self, retry_count: Optional[int] = 0) -> bool:
+    def _perform_websocket_handshake(
+        self, retry_count: Optional[int] = 0
+    ) -> bool:  # needs more comments?
         retry_count = retry_count
 
         if retry_count >= 5:
