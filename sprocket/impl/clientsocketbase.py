@@ -34,7 +34,11 @@ from ..frame_models import (
     WebSocketFrameDecoder,
     FrameOpcodes,
 )  # Import used classes.
-from ..functions import check_port, check_frame_size  # Import used functions.
+from ..functions import (
+    check_port,
+    check_frame_size,
+    check_if_control,
+)  # Import used functions.
 from ..exceptions import TCPPortException, FrameSizeException  # Import used exceptions.
 
 
@@ -103,15 +107,17 @@ class ClientSocketBaseImpl:
         return base64_random_key
 
     def _setup_socket(self) -> None:
-        self._client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._client_socket.setblocking(True)
+        self._client_socket = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM
+        )  # Set up the socket as a TCP socket.
+        self._client_socket.setblocking(True)  # Set the socket blocking to true.
 
     def _close_socket(self) -> None:
-        # Close the socket
-        if self._socket_open:
+        if self._socket_open:  # If the socket is not already closed.
             logger.warning("Closing socket")
-            self._socket_open = False
-            self._client_socket.close()
+
+            self._socket_open = False  # Close the loop.
+            self._client_socket.close()  # Close the socket.
             return
 
     def _send_websocket_message(
@@ -192,17 +198,14 @@ class ClientSocketBaseImpl:
 
             return None  # Return no data.
 
-    def _perform_websocket_handshake(
-        self, retry_count: Optional[int] = 0
-    ) -> bool:  # needs more comments?
-        retry_count = retry_count
+    def _perform_websocket_handshake(self, retry_count: Optional[int] = 0) -> bool:
+        retry_count = retry_count  # Set the retry count.
 
-        if retry_count >= 5:
+        if retry_count >= 5:  # Stop if attempts >= 5.
             return False
 
         logger.debug("Performing WebSocket Handshake")
 
-        # Create the handshake request and encode it (utf-8).
         handshake_request: bytes = (
             f"GET /websocket HTTP/1.1\r\n"
             f"Host: {self._HOST}:{self._PORT}\r\n"
@@ -211,28 +214,36 @@ class ClientSocketBaseImpl:
             f"Sec-WebSocket-Key: {self._WEBSOCKET_KEY}\r\n"
             f"Sec-WebSocket-Version: 13\r\n"
             "\r\n"
-        ).encode("utf-8")
+        ).encode(
+            "utf-8"
+        )  # Create the handshake request and encode it (utf-8).
 
         self._client_socket.send(
             handshake_request
         )  # Send the handshake request to the server.
 
-        response: str = self._read_recv()
+        response: str = self._read_recv()  # Retrieve the response.
 
-        if response:
-            response = response.decode("utf-8")  # Retrieve the response.
+        if not response:
+            self.close()
+
+        response = response.decode("utf-8")  # Retrieve the response.
 
         if response and self._response_handler.validate_handshake_response(
             handshake_response=response
-        ):
+        ):  # If the handshake response is valid.
             logger.success("Connection to server complete.")
 
-            self._trigger(event="connection", socket=self._client_socket)
+            self._trigger(
+                event="connection", socket=self._client_socket
+            )  # Trigger the on connection event logic.
             return True
 
-        retry_count += 1
+        retry_count += 1  # If invalid try again.
 
-        self._perform_websocket_handshake(retry_count=retry_count)
+        self._perform_websocket_handshake(
+            retry_count=retry_count
+        )  # Call the function again.
 
     def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
         # Check the FIN bit in the first byte of the frame.
@@ -266,28 +277,30 @@ class ClientSocketBaseImpl:
                 final_message += (
                     message_payload  # Add the decoded message to the final message.
                 )
-            else:
-                # This is a non-fragmented frame
-                self._frame_decoder.decode_websocket_message(
-                    frame_in_bytes=frame_in_bytes
-                )  # Decode the frame.
+                continue
 
-                control_opcode = (
-                    self._frame_decoder.opcode
-                )  # Retrieve the opcode (control frames can't be fragmented).
+            # This is a non-fragmented frame
+            self._frame_decoder.decode_websocket_message(
+                frame_in_bytes=frame_in_bytes
+            )  # Decode the frame.
 
+            control_opcode = (
+                self._frame_decoder.opcode
+            )  # Retrieve the opcode (control frames can't be fragmented).
+
+            if check_if_control(opcode=control_opcode) and not final_message:
                 self._check_control_frame(
                     opcode=control_opcode
                 )  # Check which opcode is present.
 
-                message_payload = self._frame_decoder.payload_data.decode(
-                    "utf-8"
-                )  # Retrieve the decoded payload_data.
+            message_payload = self._frame_decoder.payload_data.decode(
+                "utf-8"
+            )  # Retrieve the decoded payload_data.
 
-                final_message += (
-                    message_payload  # Add the decoded message to the final message.
-                )
-                break  # Break the loop early so no more data is read for this message.
+            final_message += (
+                message_payload  # Add the decoded message to the final message.
+            )
+            break  # Break the loop early so no more data is read for this message.
 
         if (
             final_message and frame_in_bytes
@@ -333,4 +346,4 @@ class ClientSocketBaseImpl:
 
     def _listen_for_messages(self) -> None:
         while self._socket_open:
-            self._handle_message()
+            self._handle_message()  # Forever checks for messages until socket is closed.

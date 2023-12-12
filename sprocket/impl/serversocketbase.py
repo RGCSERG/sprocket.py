@@ -33,7 +33,11 @@ from ..frame_models import (
     WebSocketFrameDecoder,
     FrameOpcodes,
 )  # Import used classes.
-from ..functions import check_port, check_frame_size  # Import used functions.
+from ..functions import (
+    check_port,
+    check_frame_size,
+    check_if_control,
+)  # Import used functions.
 from ..exceptions import (
     TCPPortException,
     FrameSizeException,
@@ -389,28 +393,30 @@ class ServerSocketBaseImpl(ServerSocket):
                 final_message += (
                     message_payload  # Add the decoded message to the final message.
                 )
-            else:
-                # This is a non-fragmented frame
-                self._frame_decoder.decode_websocket_message(
-                    frame_in_bytes=frame_in_bytes
-                )  # Decode the frame.
+                continue
 
-                control_opcode = (
-                    self._frame_decoder.opcode
-                )  # Retrieve the opcode (control frames can't be fragmented).
+            # This is a non-fragmented frame
+            self._frame_decoder.decode_websocket_message(
+                frame_in_bytes=frame_in_bytes
+            )  # Decode the frame.
 
+            control_opcode = (
+                self._frame_decoder.opcode
+            )  # Retrieve the opcode (control frames can't be fragmented).
+
+            if check_if_control(opcode=control_opcode) and not final_message:
                 self._check_control_frame(
-                    opcode=control_opcode, socket=socket
+                    opcode=control_opcode
                 )  # Check which opcode is present.
 
-                message_payload = self._frame_decoder.payload_data.decode(
-                    "utf-8"
-                )  # Retrieve the decoded payload_data.
+            message_payload = self._frame_decoder.payload_data.decode(
+                "utf-8"
+            )  # Retrieve the decoded payload_data.
 
-                final_message += (
-                    message_payload  # Add the decoded message to the final message.
-                )
-                break  # Break the loop early so no more data is read for this message.
+            final_message += (
+                message_payload  # Add the decoded message to the final message.
+            )
+            break  # Break the loop early so no more data is read for this message.
 
         if (
             final_message and frame_in_bytes
