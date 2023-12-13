@@ -26,9 +26,7 @@ from .clientsocketbase import *
 __all__: Final[List[str]] = ["ClientSocketImpl"]
 
 
-class ClientSocketImpl(
-    ClientSocketBaseImpl
-):  # rework with new frame encoder and websocketframe class updates + comments + sort layout
+class ClientSocketImpl(ClientSocketBaseImpl):  #  comments + sort layout
     def __init__(
         self,
         HOST: Optional[str] = "localhost",
