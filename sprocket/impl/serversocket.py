@@ -24,9 +24,7 @@ from .serversocketbase import *
 __all__: Final[List[str]] = ["ServerSocket"]
 
 
-class ServerSocket(
-    ServerSocketBaseImpl
-):  # rework with new frame encoder and websocketframe class updates + comments
+class ServerSocket(ServerSocketBaseImpl):
     """
     Class for a WebSocket server implementation that handles WebSocket connections, messages and HTTP requests.
     """
@@ -90,6 +88,7 @@ class ServerSocket(
         for socket in self._active_sockets:  # For each active socket.
             self._close_socket(socket=socket)  # Send a control close connection frame.
         self.main_thread = False  # Terminate the server listening thread.
+        self._server_socket.close()
 
     def join_room(self, room_name: str, socket: socket) -> None:
         if room_name not in self._rooms:  # If the room name does not exist.
@@ -154,16 +153,16 @@ class ServerSocket(
     def to(
         self, room_name: str
     ) -> Type["RoomEmitter"]:  # Type is used here to avoid undefined errors.
-        if room_name not in self._rooms:  # Implement some error handling logic.
-            self._rooms[room_name] = []  # Not a viable solution.
+        if room_name not in self._rooms:  # If the room does not exist.
+            logger.warning(
+                f"Room with id: {room_name}, does not exist."
+            )  # Log the error.
 
-        room_users: list = self._rooms[
-            room_name
-        ]  # Set list of sockets to list room_users.
+        room_users: list = (
+            self._rooms[room_name] if room_name in self._rooms else []
+        )  # Set list of sockets to list room_users.
 
-        return RoomEmitter(
-            server_socket=self, room_users=room_users, TIMEOUT=self._TIMEOUT
-        )
+        return RoomEmitter(server_socket=self, room_users=room_users)
 
 
 class RoomEmitter:
@@ -172,9 +171,7 @@ class RoomEmitter:
     not just all or one client.
     """
 
-    def __init__(
-        self, server_socket: ServerSocket, room_users: list, TIMEOUT: int
-    ) -> None:
+    def __init__(self, server_socket: ServerSocket, room_users: list) -> None:
         """
         Initialiser method.
 
@@ -182,13 +179,13 @@ class RoomEmitter:
             server_socket ServerSocketImpl: The current instance of the server.
             room list: The list of sockets in the specified room.
         """
-        self._TIMEOUT = TIMEOUT
+        self._TIMEOUT = server_socket._TIMEOUT
         self._server_socket = server_socket  # Initialise instance of the server.
         self._room_users: list = room_users  # Initialise room's socket list.
 
     def emit(self, event: str, payload: (str | bytes | dict | None)) -> None:
         """
-        Method used for emitting message to specific room, with use of the private emit message,
+        Method used for emitting message to specific room, with use of the private emit method,
         with respect to the current instance of the ServerSocketImpl instance.
 
         Args:
@@ -197,11 +194,8 @@ class RoomEmitter:
             the specific type of the payload doesn't matter (too much) as will be automatically converted
             to str by the emit function.
         """
-        writeable_sockets = select.select([], self._room_users, [], self._TIMEOUT)[
-            0
-        ]  # Check which sockets are writeable.
 
-        for socket in writeable_sockets:  # Iterates through each socket in the room.
+        for socket in self._room_users:  # Iterates through each socket in the room.
             self._server_socket.emit(
                 event=event, socket=socket, payload=payload
             )  # For each socket in the room, a message is directly sent.
