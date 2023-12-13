@@ -37,10 +37,12 @@ from ..functions import (
     check_port,
     check_frame_size,
     check_if_control,
+    check_endpoint,
 )  # Import used functions.
 from ..exceptions import (
     TCPPortException,
     FrameSizeException,
+    WSEndpointException,
 )  # Import used exceptions.
 from .requesthandler import *  # Import RequestHandler.
 
@@ -65,23 +67,29 @@ class ServerSocketBaseImpl(ServerSocket):
     ) -> None:
         if PORT is not None and not check_port(
             PORT=PORT  # Checks if provided value is valid.
-        ):  # Checks if TCP_PORT is not none, if not then checks whether the provided value is valid.
-            raise TCPPortException  # If value provided is not valid, raise ValueError
-        else:
-            # If no value provided, set _PORT to default value.
-            self._PORT = PORT
+        ):  # Checks if TCP_PORT is not None, if not then checks whether the provided value is valid.
+            raise TCPPortException  # If value provided is not valid, raise ValueError.
+
+        # If no value provided or provided value valid, set _PORT to default value / provided value.
+        self._PORT: int = PORT
 
         if MAX_FRAME_SIZE is not None and not check_frame_size(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE  # Checks whether provided value is valid.
-        ):  # Checks if MAX_FRAME_SIZE is not none, if not then checks whether the provided value is valid.
+        ):  # Checks if MAX_FRAME_SIZE is not None, if not then checks whether the provided value is valid.
             raise FrameSizeException  # If value provided is not valid raise ValueError.
-        else:
-            # Value not set in this class.
-            pass
+
+        # Value not set in this class.
+
+        if WS_ENDPOINT is not None and not check_endpoint(
+            WS_ENDPOINT=WS_ENDPOINT  # Checks if provided value is valid.
+        ):  # Checks if WS_ENDPOINT is not None, if not then checks whether the provided value is valid.
+            raise WSEndpointException  # If value provided is not valid, raise ValueError.
+
+        # If no value provided or provided value valid, set _WS_ENDPOINT to default value / provided value.
+        self._WS_ENDPOINT: str = WS_ENDPOINT
 
         self._HOST: str = HOST  # Server Host domain.
         self._BUFFER_SIZE: int = BUFFER_SIZE  # Set buffer size (in bits).
-        self._WS_ENDPOINT: str = WS_ENDPOINT  # WebSocket connection route.
         self._TIMEOUT: int = TIMEOUT  # Set select socket timeout.
         self._BACKLOG: int = BACKLOG  # Set server backlog.
         self._WEBSOCKET_GUID: str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"  # Sets the GUID to the GUID defined in RFC6455
@@ -157,7 +165,7 @@ class ServerSocketBaseImpl(ServerSocket):
                 socket=socket
             )  # Remove given socket from all rooms (if in).
 
-            self._trigger("disconnect")
+            self._trigger("disconnect", socket=socket)
 
             socket.close()  # Finnaly, close the socket.
             return
@@ -462,9 +470,8 @@ class ServerSocketBaseImpl(ServerSocket):
 
             return
 
-        # If an error has occcured removed the socket from readable lists, as not to cause more errors.
-        self._remove_socket_from_lists(socket=client_socket)
-        self.leave_room(socket=client_socket)
+        # If an error has occcured close the socket, to stop more errors occuring.
+        self._close_socket(socket=client_socket)
 
         logger.critical(f"Socket Forcibly closed {client_socket}")
 
@@ -497,13 +504,13 @@ class ServerSocketBaseImpl(ServerSocket):
 
     def _listen_for_messages(self) -> None:
         while self.main_thread:  # While the server is active.
-            readable_sockets: list = select.select(
-                self._active_sockets, [], [], self._TIMEOUT
+            readable_server_socket: list = select.select(
+                [self._server_socket], [], [], self._TIMEOUT
             )[
                 0
-            ]  # Retrieve readable sockets.
+            ]  # Check if server socket is readable..
 
-            for socket in readable_sockets:  # For each readable socket.
+            for socket in readable_server_socket:  # For each readable socket.
                 if socket.fileno() == -1:
                     # There is no data to be read.
                     continue
