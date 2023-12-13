@@ -253,15 +253,15 @@ class ServerSocket(ABC):
     @abstractmethod
     def start(self) -> None:
         """
-        Starts the WebSocket server and listens for incoming connections.
-        This method listens for incoming connections on the specified host and port,
-        and starts a separate thread to handle incoming messages from each client instance.
+        Starts the WebSocket server and listens for incoming connections on the specified host and port,
+        using the _listen_for_messages method as the main listening thread.
         """
 
     @abstractmethod
     def leave_room(self, socket: socket, room_name: Optional[str] = "") -> None:
         """
-        Removes a client (identified by their socket) from a specified chat room.
+        Removes a client (identified by their socket) from a specified chat room,
+        if no room is provided the client socket is removed from all its active rooms.
 
         Args:
             socket socket: The client socket to be removed from the chat room.
@@ -277,7 +277,7 @@ class ServerSocket(ABC):
     @abstractmethod
     def join_room(self, room_name: str, socket: socket) -> None:
         """
-        Adds a client (identified by their socket) to a specified chat room.
+        Adds a client (identified by their socket) to a specified chat room, creating the room if it doesn't exist.
 
         Args:
             socket socket: The client socket to be added to the chat room.
@@ -290,7 +290,7 @@ class ServerSocket(ABC):
     ) -> None:
         """
         Emits a message to any given client socket,
-        converting the event and payload into a keyword: value dictionary.
+        converting the event and payload into a keyword:value dictionary.
 
         Args:
             event str: The given event for the WebSocket message to be send across.
@@ -321,7 +321,7 @@ class ServerSocket(ABC):
     @abstractmethod
     def on(self, event: str, handler: Callable) -> None:
         """
-        Registers custom event handlers to respond to specific events.
+        Registers any given custom event handler,  to a specific event.
 
         Args:
             event str: The event to listen for.
@@ -333,7 +333,8 @@ class ServerSocket(ABC):
         self, room_name: str
     ) -> Type["RoomEmitter"]:  # Type is used here to avoid undefined errors.
         """
-        Emits a message to a specific room, with use of the RoomEmitter class defined below.
+        Emits a message to a specific room, returning an instance of the RoomEmitter class,
+        (defined below).
 
         Args:
             room_name str: The specific room to be emitted to.
