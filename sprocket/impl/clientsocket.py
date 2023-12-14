@@ -48,10 +48,6 @@ class ClientSocketImpl(ClientSocketBaseImpl):  #  comments + sort layout
         )  # maybe implement some decent id system
 
     def start(self) -> None:
-        """
-        Establish a WebSocket connection with the server.
-        This method performs the WebSocket handshake and starts listening for messages.
-        """
         try:
             self._client_socket.connect((self._HOST, self._PORT))
 
@@ -70,9 +66,6 @@ class ClientSocketImpl(ClientSocketBaseImpl):  #  comments + sort layout
             logger.warning("Connection to server actively refused")
 
     def close(self) -> None:
-        """
-        Close the WebSocket connection by sending a close frame to the server.
-        """
         logger.warning("Sending Close Frame")
         if self._socket_open:
             self._send_websocket_message(opcode=self._frame_types.close)
@@ -86,13 +79,6 @@ class ClientSocketImpl(ClientSocketBaseImpl):  #  comments + sort layout
             self._send_websocket_message(opcode=self._frame_types.ping)
 
     def on(self, event: str, handler: Callable) -> None:
-        """
-        Register an event handler for a specific event.
-
-        Args:
-            event str: The name of the event to register.
-            handler Callable: The event handler function.
-        """
         if event not in self._event_handlers:
             self._event_handlers[event] = []
         self._event_handlers[event].append(handler)
