@@ -27,7 +27,8 @@ from typing import (
     Literal,
     Optional,
 )  # Used for type annotations and decloration.
-from loguru import logger  # Used for consoPORTBUFFER_SIZEle logging.
+from loguru import logger  # Used for console logging.
+from ..sockets import ClientSocket  # Import abstract class.
 from .responsehandler import *
 from ..frame_models import (
     WebSocketFrameEncoder,
@@ -38,37 +39,50 @@ from ..functions import (
     check_port,
     check_frame_size,
     check_if_control,
+    check_endpoint,
 )  # Import used functions.
-from ..exceptions import TCPPortException, FrameSizeException  # Import used exceptions.
+from ..exceptions import (
+    TCPPortException,
+    FrameSizeException,
+    WSEndpointException,
+)  # Import used exceptions.
 
 
 __all__: Final[List[str]] = ["ClientSocketBaseImpl"]
 
 
-class ClientSocketBaseImpl:
+class ClientSocketBaseImpl(ClientSocket):
     def __init__(
         self,
         HOST: Optional[str] = "localhost",
         PORT: Optional[int] = 1000,
         BUFFER_SIZE: Optional[int] = 8192,
-        TIMEOUT: Optional[int] = 5,
+        WS_ENDPOINT: Optional[str] = "/websocket",
         MAX_FRAME_SIZE: Optional[int] = 125,
+        TIMEOUT: Optional[int] = 5,
     ) -> None:
         if PORT is not None and not check_port(
             PORT=PORT  # Checks if provided value is valid.
-        ):  # Checks if TCP_PORT is not none, if not then checks whether the provided value is valid.
-            raise TCPPortException  # If value provided is not valid, raise ValueError
-        else:
-            # If no value provided, set _PORT to default value.
-            self._PORT = PORT
+        ):  # Checks if TCP_PORT is not None, if not then checks whether the provided value is valid.
+            raise TCPPortException  # If value provided is not valid, raise ValueError.
+
+        # If no value provided or provided value valid, set _PORT to default value / provided value.
+        self._PORT: int = PORT
 
         if MAX_FRAME_SIZE is not None and not check_frame_size(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE  # Checks whether provided value is valid.
-        ):  # Checks if MAX_FRAME_SIZE is not none, if not then checks whether the provided value is valid.
+        ):  # Checks if MAX_FRAME_SIZE is not None, if not then checks whether the provided value is valid.
             raise FrameSizeException  # If value provided is not valid raise ValueError.
-        else:
-            # Value not set in this class.
-            pass
+
+        # Value not set in this class.
+
+        if WS_ENDPOINT is not None and not check_endpoint(
+            WS_ENDPOINT=WS_ENDPOINT  # Checks if provided value is valid.
+        ):  # Checks if WS_ENDPOINT is not None, if not then checks whether the provided value is valid.
+            raise WSEndpointException  # If value provided is not valid, raise ValueError.
+
+        # If no value provided or provided value valid, set _WS_ENDPOINT to default value / provided value.
+        self._WS_ENDPOINT: str = WS_ENDPOINT
 
         self._WEBSOCKET_KEY = (
             self._generate_random_websocket_key()
@@ -82,17 +96,19 @@ class ClientSocketBaseImpl:
             str, List[Callable]
         ] = {}  # Initialise _event_handlers.
         self._socket_open = False  # Initialise _socket_open to open (True).
+        self._response_handler: HTTPResponseHandler = HTTPResponseHandler(
+            WEBSOCKET_KEY=self._WEBSOCKET_KEY
+        )  # Initialise _response_handler.
         self._frame_decoder = WebSocketFrameDecoder(
             status=True
         )  # Initialise _frame_decoder.
         self._frame_encoder = WebSocketFrameEncoder(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE, IS_MASKED=True
         )  # Initialise _frame_encoder.
-        self._response_handler: HTTPResponseHandler = HTTPResponseHandler(
-            WEBSOCKET_KEY=self._WEBSOCKET_KEY
-        )  # Initialise _response_handler.
 
         self._setup_socket()  # Setup socket.
+
+    # Private methods.
 
     @staticmethod
     def _generate_random_websocket_key() -> str:
@@ -159,9 +175,7 @@ class ClientSocketBaseImpl:
             opcode=FrameOpcodes.pong
         )  # Send a pong frame using _send_websocket_message method.
 
-    def _read_recv(
-        self,
-    ) -> Any | None:
+    def _read_recv(self) -> Any | None:
         readable_sockets: list = select.select(
             [self._client_socket], [], [], self._TIMEOUT
         )[
@@ -198,123 +212,6 @@ class ClientSocketBaseImpl:
 
             return None  # Return no data.
 
-    def _perform_websocket_handshake(self, retry_count: Optional[int] = 0) -> bool:
-        retry_count = retry_count  # Set the retry count.
-
-        if retry_count >= 5:  # Stop if attempts >= 5.
-            return False
-
-        logger.debug("Performing WebSocket Handshake")
-
-        handshake_request: bytes = (
-            f"GET /websocket HTTP/1.1\r\n"
-            f"Host: {self._HOST}:{self._PORT}\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            f"Sec-WebSocket-Key: {self._WEBSOCKET_KEY}\r\n"
-            f"Sec-WebSocket-Version: 13\r\n"
-            "\r\n"
-        ).encode(
-            "utf-8"
-        )  # Create the handshake request and encode it (utf-8).
-
-        self._client_socket.send(
-            handshake_request
-        )  # Send the handshake request to the server.
-
-        response: str = self._read_recv()  # Retrieve the response.
-
-        if not response:
-            self.close()
-
-        response = response.decode("utf-8")  # Retrieve the response.
-
-        if response and self._response_handler.validate_handshake_response(
-            handshake_response=response
-        ):  # If the handshake response is valid.
-            logger.success("Connection to server complete.")
-
-            self._trigger(
-                event="connection", socket=self._client_socket
-            )  # Trigger the on connection event logic.
-            return True
-
-        retry_count += 1  # If invalid try again.
-
-        self._perform_websocket_handshake(
-            retry_count=retry_count
-        )  # Call the function again.
-
-    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
-        # Check the FIN bit in the first byte of the frame.
-        return (frame_in_bytes[0] & 0x80) >> 7 == 1
-
-    def _handle_message(self) -> None:
-        frame_in_bytes: bytes = b""  # Initialise frame_in_bytes.
-        final_message: str = ""  # Initialise final_message.
-
-        while True:
-            frame_data = self._read_recv()  # Read socket data.
-
-            if frame_data == None:
-                # Connection closed, or no data received.
-                break
-
-            logger.debug("Handling websocket message")
-
-            frame_in_bytes = frame_data  # set frame_in_bytes to frame_data.
-
-            if not self._is_final_frame(frame_in_bytes):
-                # This is a fragmented frame
-                self._frame_decoder.decode_websocket_message(
-                    frame_in_bytes=frame_in_bytes
-                )  # Decode the given frame.
-
-                message_payload = self._frame_decoder.payload_data.decode(
-                    "utf-8"
-                )  # Retrieve the decoded payload_data.
-
-                final_message += (
-                    message_payload  # Add the decoded message to the final message.
-                )
-                continue
-
-            # This is a non-fragmented frame
-            self._frame_decoder.decode_websocket_message(
-                frame_in_bytes=frame_in_bytes
-            )  # Decode the frame.
-
-            control_opcode = (
-                self._frame_decoder.opcode
-            )  # Retrieve the opcode (control frames can't be fragmented).
-
-            if check_if_control(opcode=control_opcode) and not final_message:
-                self._check_control_frame(
-                    opcode=control_opcode
-                )  # Check which opcode is present.
-
-            message_payload = self._frame_decoder.payload_data.decode(
-                "utf-8"
-            )  # Retrieve the decoded payload_data.
-
-            final_message += (
-                message_payload  # Add the decoded message to the final message.
-            )
-            break  # Break the loop early so no more data is read for this message.
-
-        if (
-            final_message and frame_in_bytes
-        ):  # If both the final message and frame are present.
-            frame_in_bytes = b""  # Reset the frame_in_bytes.
-
-            message_dict: dict = json.loads(
-                final_message
-            )  # Load the final message (always a dictionary).
-
-            self._trigger_event_from_message(
-                final_message=message_dict
-            )  # Trigger the event given.
-
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
         if event in self._event_handlers:  # If the event is in _event_handlers.
             for handler in self._event_handlers[
@@ -343,6 +240,126 @@ class ClientSocketBaseImpl:
         self._trigger(event, final_message[event])  # Trigger the event given.
 
         return
+
+    def _perform_websocket_handshake(self, retry_count: Optional[int] = 0) -> bool:
+        retry_count = retry_count  # Set the retry count.
+
+        if retry_count >= 5:  # Stop if attempts >= 5.
+            return False
+
+        logger.debug("Performing WebSocket Handshake")
+
+        handshake_request: bytes = (
+            f"GET {self._WS_ENDPOINT} HTTP/1.1\r\n"
+            f"Host: {self._HOST}:{self._PORT}\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {self._WEBSOCKET_KEY}\r\n"
+            f"Sec-WebSocket-Version: 13\r\n"
+            "\r\n"
+        ).encode(
+            "utf-8"
+        )  # Create the handshake request and encode it (utf-8).
+
+        self._client_socket.send(
+            handshake_request
+        )  # Send the handshake request to the server.
+
+        response: str = self._read_recv()  # Retrieve the response.
+
+        if response:
+            response = response.decode("utf-8")  # Retrieve the response.
+
+        if response and self._response_handler.validate_handshake_response(
+            handshake_response=response
+        ):  # If the handshake response is valid.
+            logger.success("Connection to server complete.")
+
+            self._trigger(
+                event="connection", socket=self._client_socket
+            )  # Trigger the on connection event logic.
+            return True
+
+        self.close()  # close the connection
+
+        retry_count += 1  # If invalid try again.
+
+        self._perform_websocket_handshake(
+            retry_count=retry_count
+        )  # Call the function again.
+
+    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
+        # Check the FIN bit in the first byte of the frame.
+        return (frame_in_bytes[0] & 0x80) >> 7 == 1
+
+    def _handle_message(self) -> None:
+        frame_in_bytes: bytes = b""  # Initialise frame_in_bytes.
+        final_message: str = ""  # Initialise final_message.
+        fragmented: bool = False  # Initialise fragmented.
+
+        while True:
+            frame_data = self._read_recv()  # Read socket data.
+
+            if frame_data == None:
+                # Connection closed, or no data received.
+                break
+
+            logger.debug("Handling websocket message")
+
+            frame_in_bytes = frame_data  # set frame_in_bytes to frame_data.
+
+            if not self._is_final_frame(frame_in_bytes):
+                # This is a fragmented frame
+                fragmented = True
+
+                self._frame_decoder.decode_websocket_message(
+                    frame_in_bytes=frame_in_bytes
+                )  # Decode the given frame.
+
+                message_payload = self._frame_decoder.payload_data.decode(
+                    "utf-8"
+                )  # Retrieve the decoded payload_data.
+
+                final_message += (
+                    message_payload  # Add the decoded message to the final message.
+                )
+                continue
+
+            # This is a non-fragmented frame
+            self._frame_decoder.decode_websocket_message(
+                frame_in_bytes=frame_in_bytes
+            )  # Decode the frame.
+
+            control_opcode = (
+                self._frame_decoder.opcode
+            )  # Retrieve the opcode (control frames can't be fragmented).
+
+            if check_if_control(opcode=control_opcode) and not fragmented:
+                self._check_control_frame(
+                    opcode=control_opcode
+                )  # Check which opcode is present.
+
+            message_payload = self._frame_decoder.payload_data.decode(
+                "utf-8"
+            )  # Retrieve the decoded payload_data.
+
+            final_message += (
+                message_payload  # Add the decoded message to the final message.
+            )
+            break  # Break the loop early so no more data is read for this message.
+
+        if (
+            final_message and frame_in_bytes
+        ):  # If both the final message and frame are present.
+            frame_in_bytes = b""  # Reset the frame_in_bytes.
+
+            message_dict: dict = json.loads(
+                final_message
+            )  # Load the final message (always a dictionary).
+
+            self._trigger_event_from_message(
+                final_message=message_dict
+            )  # Trigger the event given.
 
     def _listen_for_messages(self) -> None:
         while self._socket_open:
