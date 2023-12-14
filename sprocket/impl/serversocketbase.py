@@ -376,6 +376,7 @@ class ServerSocketBaseImpl(ServerSocket):
     def _handle_message(self, socket: socket) -> None:
         frame_in_bytes: bytes = b""  # Initialise frame_in_bytes.
         final_message: str = ""  # Initialise final_message.
+        fragmented: bool = False  # Initialise fragmented.
 
         while True:
             frame_data = self._read_recv(socket=socket)  # Read socket data.
@@ -390,6 +391,8 @@ class ServerSocketBaseImpl(ServerSocket):
 
             if not self._is_final_frame(frame_in_bytes):
                 # This is a fragmented frame
+                fragmented = True
+
                 self._frame_decoder.decode_websocket_message(
                     frame_in_bytes=frame_in_bytes
                 )  # Decode the given frame.
@@ -412,7 +415,7 @@ class ServerSocketBaseImpl(ServerSocket):
                 self._frame_decoder.opcode
             )  # Retrieve the opcode (control frames can't be fragmented).
 
-            if check_if_control(opcode=control_opcode) and not final_message:
+            if check_if_control(opcode=control_opcode) and not fragmented:
                 self._check_control_frame(
                     opcode=control_opcode
                 )  # Check which opcode is present.
