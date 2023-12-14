@@ -154,7 +154,7 @@ class ServerSocket(ABC):
     @abstractmethod
     def _read_recv(self, socket: socket) -> Any | None:
         """
-        Reads data from the client socket, by waiting for incoming messages,
+        Reads data from a client socket, by waiting for incoming messages,
         and retrying if errors occur.
 
         Args:
@@ -293,7 +293,7 @@ class ServerSocket(ABC):
         converting the event and payload into a keyword:value dictionary.
 
         Args:
-            event str: The given event for the WebSocket message to be send across.
+            event str: The given event for the WebSocket message to be sent across.
             socket socket: The client socket to which the message is to be sent too.
             payload (str | bytes | dict | None): The payload to be sent with the event.
         """
