@@ -5,7 +5,7 @@ Provides functions for checking user entered attributes.
 from .checkframesize import *
 from .checkport import *
 from .checkifcontrol import *
-from checkendpoint import *
+from .checkendpoint import *
 
 """Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
