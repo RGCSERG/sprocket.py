@@ -96,8 +96,8 @@ class ClientSocketBaseImpl(ClientSocket):
             str, List[Callable]
         ] = {}  # Initialise _event_handlers.
         self._socket_open = False  # Initialise _socket_open to open (True).
-        self._response_handler: HTTPResponseHandler = HTTPResponseHandler(
-            WEBSOCKET_KEY=self._WEBSOCKET_KEY
+        self._response_handler: HTTPResponseHandler = (
+            HTTPResponseHandler()
         )  # Initialise _response_handler.
         self._frame_decoder = WebSocketFrameDecoder(
             status=True
@@ -112,8 +112,7 @@ class ClientSocketBaseImpl(ClientSocket):
 
     @staticmethod
     def _generate_random_websocket_key() -> str:
-        # Generate a 16 byte key.
-        random_key = secrets.token_bytes(16)
+        random_key = secrets.token_bytes(16)  # Generate a 16 byte key.
 
         # Encode the random bytes to base64.
         base64_random_key = base64.b64encode(random_key).decode(
