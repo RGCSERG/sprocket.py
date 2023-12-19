@@ -33,7 +33,8 @@ class HTTPRequestHandler:
     """
     HTTPRequestHandler is responsible for handling any given incoming WebSocket handshake request over HTTP.
 
-    Containing methods to parse the request data, validate the WebSocket handshake, and process the incoming requests.
+    Containing methods to parse the request data, validate the WebSocket handshake, and process the incoming requests,
+    returning apropriate data.
     """
 
     def __init__(self, WS_ENDPOINT: str, HOST: str, PORT: int) -> None:
@@ -67,7 +68,7 @@ class HTTPRequestHandler:
 
         method, target, http_version = first_line.split(
             " "
-        )  # Provide values for each value.
+        )  # Provide values for each variable.
         return method, target, http_version
 
     def _parse_headers(self, headers: list[str]) -> dict:
