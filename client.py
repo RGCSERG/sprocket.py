@@ -1,7 +1,7 @@
-from sprocket import ClientSocketImpl
+from sprocket import ClientSocket
 
 messages: list = []
-io = ClientSocketImpl()
+io = ClientSocket()
 
 
 def on_recieve(message):
