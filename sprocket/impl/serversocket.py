@@ -98,36 +98,21 @@ class ServerSocket(ServerSocketBaseImpl):
     def emit(
         self, event: str, socket: socket, payload: (str | bytes | dict | None) = ""
     ) -> None:
-        try:
-            writeable_socket = select.select([], [socket], [], self._TIMEOUT)[0][
-                0
-            ]  # Check which sockets are writeable.
-            json_data: dict = {event: payload}  # Set up the json_data.
+        json_data: dict = {event: payload}  # Set up the json_data.
 
-            payload: str = json.dumps(json_data)  # Dump the json_data into str format.
+        payload: str = json.dumps(json_data)  # Dump the json_data into str format.
 
-            frames = self._frame_encoder.encode_payload_to_frames(
-                payload=payload
-            )  # Encode the payload into WebSocket frames.
+        frames = self._frame_encoder.encode_payload_to_frames(
+            payload=payload
+        )  # Encode the payload into WebSocket frames.
 
-            for frame in frames:  # For each frame created.
-                writeable_socket.send(frame)  # Send it to the given socket.
-
-            return
-        except IndexError:
-            logger.warning(f"Socket not writeabe: {socket}")
-            return
+        for frame in frames:  # For each frame created.
+            socket.send(frame)  # Send it to the given socket.
 
     def broadcast_message(
         self, event: Optional[str] = "", payload: (str | bytes | dict | None) = ""
     ) -> None:
-        writeable_sockets = select.select(
-            [], self._websocket_sockets, [], self._TIMEOUT
-        )[
-            0
-        ]  # Check which sockets are writeable.
-
-        for socket in writeable_sockets:  # For each active socket.
+        for socket in self._websocket_sockets:  # For each active socket.
             try:
                 self.emit(
                     event=event, socket=socket, payload=payload
