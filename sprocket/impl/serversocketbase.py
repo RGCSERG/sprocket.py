@@ -134,20 +134,15 @@ class ServerSocketBaseImpl(ServerSocket):
         opcode: Optional[bytes] = 0x1,
     ) -> None:
         logger.debug("Sending Message")
+        logger.critical(payload)
 
-        try:
-            writeable_socket = select.select([], [socket], [], self._TIMEOUT)[0][0]
+        frames = self._frame_encoder.encode_payload_to_frames(
+            payload=payload, opcode=opcode
+        )  # Encoded the given payload and opcode to WebSocket frame(s).
 
-            frames = self._frame_encoder.encode_payload_to_frames(
-                payload=payload, opcode=opcode
-            )  # Encoded the given payload and opcode to WebSocket frame(s).
+        for frame in frames:  # For each frame created.
+            socket.send(frame)  # Send the frame to the provided socket.
 
-            for frame in frames:  # For each frame created.
-                writeable_socket.send(frame)  # Send the frame to the provided socket.
-
-            return
-        except IndexError:
-            logger.warning(f"Socket not writeabe: {socket}")
             return
 
     def _close_socket(self, socket: socket) -> None:
