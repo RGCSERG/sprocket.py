@@ -134,7 +134,6 @@ class ServerSocketBaseImpl(ServerSocket):
         opcode: Optional[bytes] = 0x1,
     ) -> None:
         logger.debug("Sending Message")
-        logger.critical(payload)
 
         frames = self._frame_encoder.encode_payload_to_frames(
             payload=payload, opcode=opcode
@@ -149,13 +148,15 @@ class ServerSocketBaseImpl(ServerSocket):
         with self._LOCK:  # Protect access to shared resources.
             logger.warning("closing socket")
 
+            if socket in self._websocket_sockets:  # If the socket is a WebSocket.
+                self._send_websocket_message(
+                    socket=socket, opcode=FrameOpcodes.close
+                )  # Send a close frame.
+
             self._remove_socket_from_lists(
                 socket=socket
             )  # Remove the socket from all active lists.
 
-            self._send_websocket_message(
-                socket=socket, opcode=FrameOpcodes.close
-            )  # Send a close frame.
             self.leave_room(
                 socket=socket
             )  # Remove given socket from all rooms (if in).
@@ -284,6 +285,8 @@ class ServerSocketBaseImpl(ServerSocket):
                     time.sleep(delay)  # Use delay.
 
             logger.critical("Max retries reached. Unable to read data.")
+
+            self._close_socket(socket=socket)
 
             return None  # Return no data.
 
@@ -438,6 +441,8 @@ class ServerSocketBaseImpl(ServerSocket):
             )  # Trigger the event given.
 
     def _create_new_client_thread(self, client_socket: socket) -> None:
+        critical = False  # Initialise critical.
+
         try:
             readable_sockets: list = select.select(
                 self._active_sockets, [], [], self._TIMEOUT
