@@ -185,7 +185,7 @@ class HTTPRequestHandler:
             tuple[str, Literal[False]] denoting [response, False representing a bad request],
             or tuple[dict | Any, Literal[True]] denoting [headers, True representing a valid request]
         """
-        response_body = "<html><body><h1>Default bad response</h1></body></html>"  # Set invalid response.
+        response_body = "<html><body><h1>This Server only accepts WebSocket connections.</h1></body></html>"  # Set invalid response.
         response_headers = f"HTTP/1.1 {HTTPStatus.BAD_REQUEST}\r\nContent-Length: {len(response_body)}\r\n\r\n"  # Set invalid response.
 
         full_response = (
