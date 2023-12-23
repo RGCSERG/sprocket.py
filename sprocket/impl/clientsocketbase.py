@@ -221,7 +221,13 @@ class ClientSocketBaseImpl(ClientSocket):
                     **kwargs,  # Provide required positional arguments and key arguments.
                 )  # Call the handler.
 
-    def _trigger_event_from_message(self, final_message: dict) -> None:
+    def _trigger_event_from_message(self, final_message: dict | str) -> None:
+        if type(final_message) == str:
+            logger.warning(
+                f"Message with no endpoint recieved: {final_message}"
+            )  # Log the error, no execption is needed here.
+            return
+
         final_message_keys = list(
             final_message.keys()
         )  # Extract the keys from the final message.
@@ -352,12 +358,17 @@ class ClientSocketBaseImpl(ClientSocket):
         ):  # If both the final message and frame are present.
             frame_in_bytes = b""  # Reset the frame_in_bytes.
 
-            message_dict: dict = json.loads(
-                final_message
-            )  # Load the final message (always a dictionary).
+            message_dict: dict = {}
+
+            try:
+                message_dict: dict = json.loads(
+                    final_message
+                )  # Load the final message (if a dictionary).
+            except:
+                pass
 
             self._trigger_event_from_message(
-                final_message=message_dict
+                final_message=message_dict if message_dict else final_message
             )  # Trigger the event given.
 
     def _listen_for_messages(self) -> None:
