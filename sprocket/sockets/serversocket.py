@@ -151,19 +151,19 @@ class ServerSocket(ABC):
             headers dict: The headers from the WebSocket handshake request.
         """
 
-    @abstractmethod
-    def _read_recv(self, socket: socket) -> Any | None:
-        """
-        Reads data from a client socket, by waiting for incoming messages,
-        and retrying if errors occur.
+    # @abstractmethod
+    # def _read_recv(self, socket: socket) -> Any | None:
+    #     """
+    #     Reads data from a client socket, by waiting for incoming messages,
+    #     and retrying if errors occur.
 
-        Args:
-            socket socket: The client socket for data to be read from.
+    #     Args:
+    #         socket socket: The client socket for data to be read from.
 
-        Returns:
-            data bytes: The data read from the socket,
-            or None.
-        """
+    #     Returns:
+    #         data bytes: The data read from the socket,
+    #         or None.
+    #     """
 
     @abstractmethod
     def _receive_http_request(self, socket: socket) -> str:
