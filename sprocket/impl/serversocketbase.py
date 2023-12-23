@@ -209,7 +209,13 @@ class ServerSocketBaseImpl(ServerSocket):
 
         return
 
-    def _trigger_event_from_message(self, final_message: dict) -> None:
+    def _trigger_event_from_message(self, final_message: dict | str) -> None:
+        if type(final_message) == str:
+            logger.warning(
+                f"Message with no endpoint recieved: {final_message}"
+            )  # Log the error, no execption is needed here.
+            return
+
         final_message_keys = list(
             final_message.keys()
         )  # Extract the keys from the final message.
@@ -257,44 +263,11 @@ class ServerSocketBaseImpl(ServerSocket):
 
         return
 
-    def _read_recv(self, socket: socket) -> Any | None:
-        readable_sockets: list = select.select([socket], [], [], self._TIMEOUT)[
-            0
-        ]  # Check if the socket is readable.
-
-        if socket not in readable_sockets:  # If the socket is not readable.
-            return None  # Return no data.
-
-        with self._LOCK:  # Protect access to shared resources.
-            retry_count: int = 0  # Initialise retry count.
-            MAX_RETRIES: Literal[5] = 5  # Set MAX_RETRIES to 5.
-
-            while (
-                retry_count < MAX_RETRIES and socket in readable_sockets
-            ):  # While the socket is readable and max retries has not been reached.
-                data = socket.recv(self._BUFFER_SIZE)  # Read data from the socket.
-
-                if data:  # If there is data.
-                    return data  # Return the data.
-                else:  # If not.
-                    retry_count += 1  # Update the retry_count
-                    delay: int = (
-                        0.1 * retry_count
-                    ) ** 2  # Set exponentially increasing delay.
-                    logger.warning(f"No data received, retrying in {delay} seconds...")
-                    time.sleep(delay)  # Use delay.
-
-            logger.critical("Max retries reached. Unable to read data.")
-
-            self._close_socket(socket=socket)
-
-            return None  # Return no data.
-
     def _receive_http_request(self, socket: socket) -> str:
         request_data: bytes = b""  # Initialise request data.
 
         while True:
-            http_chunk = self._read_recv(socket=socket)  # Read socket data.
+            http_chunk = socket.recv(self._BUFFER_SIZE)  # Read socket data.
 
             if not http_chunk:
                 break  # Break the loop when no more data is received.
@@ -377,9 +350,9 @@ class ServerSocketBaseImpl(ServerSocket):
         fragmented: bool = False  # Initialise fragmented.
 
         while True:
-            frame_data = self._read_recv(socket=socket)  # Read socket data.
+            frame_data = socket.recv(self._BUFFER_SIZE)  # Read socket data.
 
-            if frame_data == None:
+            if frame_data == b"":
                 # Connection closed, or no data received.
                 break
 
@@ -432,35 +405,44 @@ class ServerSocketBaseImpl(ServerSocket):
         ):  # If both the final message and frame are present.
             frame_in_bytes = b""  # Reset the frame_in_bytes.
 
-            message_dict: dict = json.loads(
-                final_message
-            )  # Load the final message (always a dictionary).
+            message_dict: dict = {}
+
+            try:
+                message_dict: dict = json.loads(
+                    final_message
+                )  # Load the final message (if a dictionary).
+            except:
+                pass
 
             self._trigger_event_from_message(
-                final_message=message_dict
+                final_message=message_dict if message_dict else final_message
             )  # Trigger the event given.
 
     def _create_new_client_thread(self, client_socket: socket) -> None:
         critical = False  # Initialise critical.
 
         try:
-            readable_sockets: list = select.select(
-                self._active_sockets, [], [], self._TIMEOUT
-            )[
-                0
-            ]  # Check if the socket is readable.
+            while client_socket in self._active_sockets:
+                readable_socket, writeable_socket, error_socket = select.select(
+                    [client_socket], [client_socket], [client_socket], self._TIMEOUT
+                )
 
-            while client_socket in readable_sockets:  # While the socket is readable.
                 if client_socket.fileno() == -1:
                     # No data to be read, so carry on to the next cycle.
                     continue
-                elif (
-                    client_socket in self._websocket_sockets
+
+                if client_socket in error_socket:
+                    break
+
+                if (
+                    client_socket in self._websocket_sockets and readable_socket
                 ):  # If the socket has opened a WebSocket connection.
                     self._handle_message(
                         socket=client_socket
                     )  # Handle the Websocket message.
-                else:
+                    continue
+
+                if client_socket in readable_socket:
                     self._handle_request(
                         socket=client_socket
                     )  # Handle normal HTTP request.
@@ -491,10 +473,7 @@ class ServerSocketBaseImpl(ServerSocket):
         )  # Append the socket to the active sockets list.
 
         logger.success(
-            "New WebSocket connection: ",
-            new_socket.fileno(),
-            " from address: ",
-            socket_address,
+            f"New Connection connection: { new_socket.fileno()} from address: {socket_address}"
         )
 
         # Create a new client thread and start it.
@@ -518,5 +497,5 @@ class ServerSocketBaseImpl(ServerSocket):
                     # There is no data to be read.
                     continue
                 if socket == self._server_socket:  # If the socket is the server socket.
-                    logger.success("Handling New HTTP connection.")
+                    logger.success("Handling New HTTP connection")
                     self._handle_connection()  # Handle the incomming HTTP connection.
