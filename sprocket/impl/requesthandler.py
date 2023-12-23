@@ -91,6 +91,27 @@ class HTTPRequestHandler:
         }
         return headers
 
+    def _check_if_ws_request(self, method: str, target: str) -> bool:
+        """
+        Determines if any given HTTP request is a WebSocket handshake request.
+
+        Args:
+            method str: The method type of the given request.
+            target str: The endpoint target of the given request.
+
+        Returns:
+            bool where True is a handshake and False is not a handshake.
+        """
+        if method != "GET":  # Checks whether the method is GET.
+            return False  # If not return an invalid request (False).
+
+        if (
+            target != self.WS_ENDPOINT
+        ):  # If the requests target is not the valid WS_ENDPOINT.
+            return False  # Return an invalid request (False).
+
+        return True
+
     def _validate_handshake(
         self, method: str, target: str, headers: dict, http_version: str
     ) -> bool:
@@ -99,23 +120,14 @@ class HTTPRequestHandler:
         for a given server.
 
         Args:
-            method str: The method type of the given request.
-            target str: The endpoint target of the given request.
             headers dict: The headers of the given requests in dictionary form.
             http_version str: The HTTP version of the request in str format.
 
         Returns:
             bool where True is a valid handshake and False is an invalid handshake.
         """
-        logger.debug("Handling WebSocket handshake request.")
 
-        if method != "GET":  # Checks whether the method is GET.
-            return False  # If not return an invalid request (False).
-
-        if (
-            target != self.WS_ENDPOINT
-        ):  # If the requests target is not the valid WS_ENDPOINT.
-            return False  # Return an invalid request (False).
+        logger.debug("Handling WebSocket handshake request")
 
         try:
             _, version = http_version.split(
@@ -185,6 +197,7 @@ class HTTPRequestHandler:
             tuple[str, Literal[False]] denoting [response, False representing a bad request],
             or tuple[dict | Any, Literal[True]] denoting [headers, True representing a valid request]
         """
+
         response_body = "<html><body><h1>This Server only accepts WebSocket connections.</h1></body></html>"  # Set invalid response.
         response_headers = f"HTTP/1.1 {HTTPStatus.BAD_REQUEST}\r\nContent-Length: {len(response_body)}\r\n\r\n"  # Set invalid response.
 
@@ -211,16 +224,18 @@ class HTTPRequestHandler:
         self.headers = headers
         self.http_version = http_version
 
-        if not request:  # Check if a request is present.
+        if not request or not self._check_if_ws_request(
+            method=method, target=target
+        ):  # Check if a request is present and that it is a websocket request.
             return full_response, False  # If not return bad request response and False.
 
         if not self._validate_handshake(
             method=method, target=target, headers=headers, http_version=http_version
         ):  # Validate the handshake request.
-            logger.warning("Handshake invalid.")
+            logger.success("Handshake invalid")
             return full_response, False  # If not return bad request response and False.
 
-        logger.success("Handshake valid.")
+        logger.success("Handshake valid")
 
         # If valid return headers and True.
         return headers, True
