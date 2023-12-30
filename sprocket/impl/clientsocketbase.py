@@ -17,7 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 
-import select, socket, threading, time, json, base64, secrets  # Import used libaries.
+import socket, threading, time, json, base64, secrets  # Import used libaries.
 from typing import (
     Any,
     Callable,
@@ -122,12 +122,6 @@ class ClientSocketBaseImpl(ClientSocket):
 
         return base64_random_key
 
-    def _setup_socket(self) -> None:
-        self._client_socket = socket.socket(
-            socket.AF_INET, socket.SOCK_STREAM
-        )  # Set up the socket as a TCP socket.
-        self._client_socket.setblocking(True)  # Set the socket blocking to true.
-
     def _close_socket(self) -> None:
         if self._socket_open:  # If the socket is not already closed.
             logger.warning("Closing socket")
@@ -135,6 +129,12 @@ class ClientSocketBaseImpl(ClientSocket):
             self._socket_open = False  # Close the loop.
             self._client_socket.close()  # Close the socket.
             return
+
+    def _setup_socket(self) -> None:
+        self._client_socket = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM
+        )  # Set up the socket as a TCP socket.
+        self._client_socket.setblocking(True)  # Set the socket blocking to true.
 
     def _send_websocket_message(
         self,
