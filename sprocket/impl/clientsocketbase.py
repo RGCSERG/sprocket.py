@@ -174,6 +174,8 @@ class ClientSocketBaseImpl(ClientSocket):
             opcode=FrameOpcodes.pong
         )  # Send a pong frame using _send_websocket_message method.
 
+        return
+
     def _check_control_frame(self, opcode: bytes) -> None:
         if (
             opcode == FrameOpcodes.close
