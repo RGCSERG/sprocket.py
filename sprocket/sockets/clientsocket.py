@@ -95,12 +95,9 @@ class ClientSocket(ABC):
         """
 
     @abstractmethod
-    def _check_control_frame(self, opcode: bytes, socket: socket) -> None:
+    def _ping(self) -> None:
         """
-        Inspects a WebSocket frame's opcode to identify control frames and handles them accordingly.
-
-        Args:
-            opcode bytes: The opcode of the WebSocket frame.
+        Sends a Ping frame to the server, prompting a pong response.
         """
 
     @abstractmethod
@@ -110,14 +107,12 @@ class ClientSocket(ABC):
         """
 
     @abstractmethod
-    def _read_recv(self) -> Any | None:
+    def _check_control_frame(self, opcode: bytes, socket: socket) -> None:
         """
-        Reads data from the socket, by waiting for incoming messages,
-        and retrying if errors occur.
+        Inspects a WebSocket frame's opcode to identify control frames and handles them accordingly.
 
-        Returns:
-            data bytes: The data read from the socket,
-            or None.
+        Args:
+            opcode bytes: The opcode of the WebSocket frame.
         """
 
     @abstractmethod
@@ -190,12 +185,6 @@ class ClientSocket(ABC):
     def close(self) -> None:
         """
         Closes the WebSocket connection by sending a close frame to the server.
-        """
-
-    @abstractmethod
-    def ping(self) -> None:
-        """
-        Sends a Ping frame to the server, prompting a pong response.
         """
 
     @abstractmethod
