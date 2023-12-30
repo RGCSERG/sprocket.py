@@ -20,6 +20,7 @@ import socket, threading, json, select
 from typing import Callable, Final, List, Optional, Type
 from loguru import logger
 from .serversocketbase import *
+from ..frame_models import FrameOpcodes
 
 __all__: Final[List[str]] = ["ServerSocket"]
 
@@ -65,6 +66,8 @@ class ServerSocket(ServerSocketBaseImpl):
         listen_thread.start()  # Start listening thread.
 
     def leave_room(self, socket: socket, room_name: Optional[str] = "") -> None:
+        rooms_to_remove = []  # Create a list to store rooms that need to be removed.
+
         if (
             room_name in self._rooms and socket in self._rooms[room_name]
         ):  # If room name provided, and the socket in that room.
@@ -89,7 +92,13 @@ class ServerSocket(ServerSocketBaseImpl):
                     socket
                 )  # Remove the socket from the room.
             if self._rooms[room_name] == []:  # If the room is empty.
-                self._rooms.pop(room_name)  # Remove the room from the rooms dictionary.
+                rooms_to_remove.append(
+                    room_name
+                )  # Remove the room from the rooms dictionary.
+
+        # Remove marked rooms outside of the loop to avoid modifying the dictionary during iteration.
+        for room in rooms_to_remove:
+            self._rooms.pop(room)
 
     def stop(self):
         for socket in self._active_sockets:  # For each active socket.
@@ -130,7 +139,7 @@ class ServerSocket(ServerSocketBaseImpl):
 
     def ping(self, socket: socket) -> None:
         self._send_websocket_message(
-            socket=socket, opcode=self.control_frame_types.ping
+            socket=socket, opcode=FrameOpcodes.ping
         )  # Send a ping frame to the client socket.
 
     def on(self, event: str, handler: Callable) -> None:
@@ -138,9 +147,9 @@ class ServerSocket(ServerSocketBaseImpl):
             self._event_handlers[
                 event
             ] = []  # Append it to the _event_handlers dictionary.
-        self._event_handlers[event].append(
+        self._event_handlers[event] = [
             handler
-        )  # Then append the provided handler to the dictionary entry.
+        ]  # Then append the provided handler to the dictionary entry.
 
     def to(
         self, room_name: str
