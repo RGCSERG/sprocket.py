@@ -22,6 +22,7 @@ from typing import Callable, Final, List, Optional
 from loguru import logger
 
 from .clientsocketbase import *
+from ..frame_models import FrameOpcodes
 
 __all__: Final[List[str]] = ["ClientSocket"]
 
@@ -63,6 +64,11 @@ class ClientSocket(ClientSocketBaseImpl):  #  comments + sort layout
                 listen_thread = threading.Thread(
                     target=self._listen_for_messages
                 )  # Open a listening thread.
+                heartbeat_thread = threading.Thread(
+                    target=self._heartbeat
+                )  # Open a heartbeat thread.
+
+                heartbeat_thread.start()  # Start the heartbeat thread.
                 listen_thread.start()  # Start the listening thread.
 
             else:
@@ -80,18 +86,8 @@ class ClientSocket(ClientSocketBaseImpl):  #  comments + sort layout
 
         if self._socket_open:  # If the socket is not already closed.
             self._send_websocket_message(
-                opcode=self._frame_types.close
+                opcode=FrameOpcodes.close
             )  # Send a close frame.
-
-        return
-
-    def ping(self) -> None:
-        if self._socket_open:  # if the socket is open.
-            logger.debug("Activating Ping")
-
-            self._send_websocket_message(
-                opcode=self.control_frame_types.ping
-            )  # Send a ping frame to the client socket.
 
         return
 
@@ -116,6 +112,7 @@ class ClientSocket(ClientSocketBaseImpl):  #  comments + sort layout
         )  # Encode the payload into WebSocket frames.
 
         for frame in frames:  # For each frame created.
-            self._client_socket.send(frame)  # Send it to the server.
+            with self._LOCK:
+                self._client_socket.send(frame)  # Send it to the server.
 
         return
