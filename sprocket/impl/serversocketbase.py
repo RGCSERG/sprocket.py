@@ -98,7 +98,7 @@ class ServerSocketBaseImpl(ServerSocket):
         self._event_handlers: Dict[
             str, List[Callable]
         ] = {}  # Initialise _event_handlers.
-        self._active_sockets: list = []  # Initialise _active_sockets.
+        self._http_sockets: list = []  # Initialise _http_sockets.
         self._websocket_sockets: list = []  # Initialise websocket sockets.
         self._request_handler: HTTPRequestHandler = HTTPRequestHandler(
             WS_ENDPOINT=WS_ENDPOINT, HOST=HOST, PORT=PORT
@@ -121,8 +121,8 @@ class ServerSocketBaseImpl(ServerSocket):
             self._websocket_sockets.remove(
                 socket
             )  # Remove the given socket from _websocket_sockets.
-        if socket in self._active_sockets:  # If the given socket is in _active_sockets.
-            self._active_sockets.remove(socket)  # Remove it from _active_sockets.
+        if socket in self._http_sockets:  # If the given socket is in _http_sockets.
+            self._http_sockets.remove(socket)  # Remove it from _http_sockets.
 
         return
 
@@ -179,9 +179,9 @@ class ServerSocketBaseImpl(ServerSocket):
             (self._HOST, self._PORT)
         )  # Bind the socket to specified host and port.
 
-        self._active_sockets.append(
+        self._http_sockets.append(
             self._server_socket
-        )  # Append socket to _active_sockets.
+        )  # Append socket to _http_sockets.
 
         return
 
@@ -423,7 +423,7 @@ class ServerSocketBaseImpl(ServerSocket):
         critical = False  # Initialise critical.
 
         try:
-            while client_socket in self._active_sockets:
+            while client_socket in self._http_sockets:
                 readable_socket, writeable_socket, error_socket = select.select(
                     [client_socket], [client_socket], [client_socket], self._TIMEOUT
                 )
@@ -470,7 +470,7 @@ class ServerSocketBaseImpl(ServerSocket):
             socket_address,
         ) = self._server_socket.accept()  # Accept the connection.
 
-        self._active_sockets.append(
+        self._http_sockets.append(
             new_socket
         )  # Append the socket to the active sockets list.
 
