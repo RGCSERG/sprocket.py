@@ -16,13 +16,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
-import base64, hashlib, random, select, socket, threading, time, json  # Import used libaries.
+import base64, hashlib, select, socket, threading, json  # Import used libaries.
 from typing import (
     Any,
     Callable,
     Final,
     List,
-    Literal,
     Dict,
     Optional,
 )  # Used for type annotations and decloration.
@@ -91,7 +90,7 @@ class ServerSocketBaseImpl(ServerSocket):
         self._HOST: str = HOST  # Server Host domain.
         self._BUFFER_SIZE: int = BUFFER_SIZE  # Set buffer size (in bits).
         self._TIMEOUT: int = TIMEOUT  # Set select socket timeout.
-        self._BACKLOG: int = BACKLOG  # Set server backlog.
+        self._BACKLOG: int = BACKLOG  # Set sockets backlog.
         self._WEBSOCKET_GUID: str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"  # Sets the GUID to the GUID defined in RFC6455
         self._LOCK = threading.Lock()  # Protect access to shared resources.
         # ---------------------- #
@@ -479,11 +478,11 @@ class ServerSocketBaseImpl(ServerSocket):
             f"New Connection connection: {new_socket.fileno()} from address: {socket_address}"
         )
 
-        # Create a new client thread and start it.
         client_listening_thread = threading.Thread(
             target=self._create_new_client_thread, args=[new_socket]
-        )
-        client_listening_thread.start()
+        )  # Create a new client listening thread.
+
+        client_listening_thread.start()  # Start the client listening thread.
 
         return
 
