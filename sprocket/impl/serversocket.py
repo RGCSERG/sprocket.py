@@ -57,10 +57,11 @@ class ServerSocket(ServerSocketBaseImpl):
         )  # Start listening proccess, specifiying maxiumum queue.
         logger.success(f"Listening on port: {self._PORT}")  # Return log message.
 
+        self.main_thread = True  # Set thread base case.
+
         listen_thread = threading.Thread(
             target=self._listen_for_messages
         )  # Initialise listening thread.
-        self.main_thread = True  # Set thread base case.
         listen_thread.start()  # Start listening thread.
 
     def leave_room(self, socket: socket, room_name: Optional[str] = "") -> None:
@@ -70,6 +71,10 @@ class ServerSocket(ServerSocketBaseImpl):
             self._rooms[room_name].remove(
                 socket
             )  # Remove the socket from the provided room.
+
+            if self._rooms[room_name] == []:  # If the room is empty.
+                self._rooms.pop(room_name)  # Remove the room from the rooms dictionary.
+
             return  # Return so no more code is run.
 
         for (
@@ -83,6 +88,8 @@ class ServerSocket(ServerSocketBaseImpl):
                 self._rooms[room_name].remove(
                     socket
                 )  # Remove the socket from the room.
+            if self._rooms[room_name] == []:  # If the room is empty.
+                self._rooms.pop(room_name)  # Remove the room from the rooms dictionary.
 
     def stop(self):
         for socket in self._active_sockets:  # For each active socket.
