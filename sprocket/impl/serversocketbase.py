@@ -144,11 +144,13 @@ class ServerSocketBaseImpl(ServerSocket):
 
             return
 
-    def _close_socket(self, socket: socket) -> None:
+    def _close_socket(self, socket: socket, critical: Optional[bool] = False) -> None:
         with self._LOCK:  # Protect access to shared resources.
             logger.warning("closing socket")
 
-            if socket in self._websocket_sockets:  # If the socket is a WebSocket.
+            if (
+                socket in self._websocket_sockets and not critical
+            ):  # If the socket is a WebSocket.
                 self._send_websocket_message(
                     socket=socket, opcode=FrameOpcodes.close
                 )  # Send a close frame.
@@ -388,7 +390,7 @@ class ServerSocketBaseImpl(ServerSocket):
 
             if check_if_control(opcode=control_opcode) and not fragmented:
                 self._check_control_frame(
-                    opcode=control_opcode
+                    opcode=control_opcode, socket=socket
                 )  # Check which opcode is present.
 
             message_payload = self._frame_decoder.payload_data.decode(
@@ -432,6 +434,7 @@ class ServerSocketBaseImpl(ServerSocket):
                     continue
 
                 if client_socket in error_socket:
+                    critical = True
                     break
 
                 if (
@@ -447,7 +450,7 @@ class ServerSocketBaseImpl(ServerSocket):
                         socket=client_socket
                     )  # Handle normal HTTP request.
 
-        except ConnectionResetError:  # If a Connection reset error occurs.
+        except:  # If a Connection error occurs.
             critical = True  # Set cirital to True.
 
         if not critical:  # If no error has occured.
@@ -456,7 +459,7 @@ class ServerSocketBaseImpl(ServerSocket):
             return
 
         # If an error has occcured close the socket, to stop more errors occuring.
-        self._close_socket(socket=client_socket)
+        self._close_socket(socket=client_socket, critical=critical)
 
         logger.critical(f"Socket Forcibly closed {client_socket}")
 
@@ -473,7 +476,7 @@ class ServerSocketBaseImpl(ServerSocket):
         )  # Append the socket to the active sockets list.
 
         logger.success(
-            f"New Connection connection: { new_socket.fileno()} from address: {socket_address}"
+            f"New Connection connection: {new_socket.fileno()} from address: {socket_address}"
         )
 
         # Create a new client thread and start it.
