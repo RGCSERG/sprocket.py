@@ -17,7 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
 
 
-import threading, json
+import threading, json, signal
 from typing import Callable, Final, List, Optional
 from loguru import logger
 
@@ -58,6 +58,11 @@ class ClientSocket(ClientSocketBaseImpl):  #  comments + sort layout
                 logger.success(
                     "WebSocket handshake successful"
                 )  # Log a successfull handshake.
+
+                signal.signal(
+                    signal.SIGINT, self.close
+                )  # Setup KeyboardInterrupt handler.
+                signal.signal(signal.SIGTERM, self.close)  # Setup termination handler.
 
                 self._socket_open = True  # Set the socket to open.
 
