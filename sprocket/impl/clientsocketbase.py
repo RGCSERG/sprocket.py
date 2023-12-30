@@ -92,6 +92,7 @@ class ClientSocketBaseImpl(ClientSocket):
         self._TIMEOUT = TIMEOUT  # Set select socket timeout.
         self._LOCK = threading.Lock()  # Set _LOCK.
         # ---------------------- #
+        self._status = True
         self._event_handlers: Dict[
             str, List[Callable]
         ] = {}  # Initialise _event_handlers.
@@ -147,9 +148,31 @@ class ClientSocketBaseImpl(ClientSocket):
         )  # Encoded the given payload and opcode to WebSocket frame(s).
 
         for frame in frames:  # For each frame created.
-            self._client_socket.send(frame)  # Send the frame to the server.
+            with self._LOCK:
+                self._client_socket.send(frame)  # Send the frame to the server.
 
         return
+
+    def _ping(self) -> None:
+        if not self._status:
+            self.close()
+            return
+
+        if self._socket_open:  # if the socket is open.
+            logger.debug("Activating Ping")
+
+            self._status = False
+
+            self._send_websocket_message(
+                opcode=FrameOpcodes.ping
+            )  # Send a ping frame to the client socket.
+
+        return
+
+    def _pong(self) -> None:
+        self._send_websocket_message(
+            opcode=FrameOpcodes.pong
+        )  # Send a pong frame using _send_websocket_message method.
 
     def _check_control_frame(self, opcode: bytes) -> None:
         if (
@@ -166,50 +189,10 @@ class ClientSocketBaseImpl(ClientSocket):
         if (
             opcode == FrameOpcodes.pong
         ):  # Check if recieved frame opcode is a pong opcode.
-            logger.success(f"Received Pong from Server.")  #
+            self._status = True
+
+            logger.success(f"Received Pong from Server.")
             return
-
-    def _pong(self) -> None:
-        self._send_websocket_message(
-            opcode=FrameOpcodes.pong
-        )  # Send a pong frame using _send_websocket_message method.
-
-    def _read_recv(self) -> Any | None:
-        readable_sockets: list = select.select(
-            [self._client_socket], [], [], self._TIMEOUT
-        )[
-            0
-        ]  # Check if the socket is readable.
-
-        if (
-            self._client_socket not in readable_sockets
-        ):  # If the socket is not readable.
-            return None  # Return no data.
-
-        with self._LOCK:  # Protect access to shared resources.
-            retry_count: int = 0  # Initialise retry count.
-            MAX_RETRIES: Literal[5] = 5  # Set MAX_RETRIES to 5.
-
-            while (
-                retry_count < MAX_RETRIES and self._client_socket in readable_sockets
-            ):  # While the socket is readable and max retries has not been reached.
-                data = self._client_socket.recv(
-                    self._BUFFER_SIZE
-                )  # Read data from the socket.
-
-                if data:  # If there is data.
-                    return data  # Return the data.
-                else:  # If not.
-                    retry_count += 1  # Update the retry_count
-                    delay: int = (
-                        0.1 * retry_count
-                    ) ** 2  # Set exponentially increasing delay.
-                    logger.warning(f"No data received, retrying in {delay} seconds...")
-                    time.sleep(delay)  # Use delay.
-
-            logger.critical("Max retries reached. Unable to read data.")
-
-            return None  # Return no data.
 
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
         if event in self._event_handlers:  # If the event is in _event_handlers.
@@ -270,7 +253,9 @@ class ClientSocketBaseImpl(ClientSocket):
             handshake_request
         )  # Send the handshake request to the server.
 
-        response: str = self._read_recv()  # Retrieve the response.
+        response: str = self._client_socket.recv(
+            self._BUFFER_SIZE
+        )  # Retrieve the response.
 
         if response:
             response = response.decode("utf-8")  # Retrieve the response.
@@ -303,9 +288,11 @@ class ClientSocketBaseImpl(ClientSocket):
         fragmented: bool = False  # Initialise fragmented.
 
         while True:
-            frame_data = self._read_recv()  # Read socket data.
+            frame_data = self._client_socket.recv(
+                self._BUFFER_SIZE
+            )  # Read socket data.
 
-            if frame_data == None:
+            if frame_data == b"":
                 # Connection closed, or no data received.
                 break
 
@@ -372,5 +359,10 @@ class ClientSocketBaseImpl(ClientSocket):
             )  # Trigger the event given.
 
     def _listen_for_messages(self) -> None:
-        while self._socket_open:
-            self._handle_message()  # Forever checks for messages until socket is closed.
+        while self._socket_open:  # While the socket is open.
+            self._handle_message()  # Check for messages until socket is closed.
+
+    def _heartbeat(self) -> None:
+        while self._socket_open:  # While the socket is open.
+            self._ping()  # Ping the server.
+            time.sleep(5)  # Every 5 seconds
