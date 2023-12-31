@@ -5,17 +5,17 @@ from loguru import logger
 io = ServerSocket()
 
 
-def main(socket: socket):
+def main(socket):
     def on_join(room_name: str):
         logger.success(room_name)
-        io.join_room(room_name=room_name, socket=socket)
+        socket.join_room(room_name=room_name)
 
     def on_send(message):
         logger.success(message)
-        io.to(room_name=message["room_ID"]).emit("recieve_message", payload=message)
+        socket.to(room_name=message["room_ID"]).emit("recieve_message", payload=message)
 
-    io.on("join_room", on_join)
-    io.on("send_message", on_send)
+    socket.on("join_room", on_join)
+    socket.on("send_message", on_send)
 
 
 io.on("connection", main)
