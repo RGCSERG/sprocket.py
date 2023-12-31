@@ -281,6 +281,8 @@ class ServerSocketBaseImpl(ServerSocket):
             socket
         )  # Add the socket to the _websocket_sockets list.
 
+        socket.start_heartbeat()
+
         self._trigger(event="connection", socket=socket)  # Trigger connection event.
 
         return
@@ -448,7 +450,7 @@ class ServerSocketBaseImpl(ServerSocket):
             SOCKET=new_socket,
             PARENT_SERVER=self,
             MAX_FRAME_SIZE=self._MAX_FRAME_SIZE,
-            BACKLOG=self._BACKLOG,
+            BUFFER_SIZE=self._BUFFER_SIZE,
         )
 
         self._http_sockets.append(
