@@ -32,15 +32,15 @@ __all__: Final[List[str]] = ["WebSocketRoom"]
 class WebSocketRoom:
     def __init__(self, name) -> None:
         self.name: str = name
-        self._members: set = set()  # Initialise set to store members in the room.
+        self.members: set = set()  # Initialise set to store members in the room.
 
     def add_member(self, member) -> None:
-        self._members.add(member)
+        self.members.add(member)
 
         return
 
     def remove_member(self, member) -> None:
-        if member in self._members:
-            self._members.remove(member)
+        if member in self.members:
+            self.members.remove(member)
 
         return
