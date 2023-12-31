@@ -108,23 +108,33 @@ class SprocketSocket(SprocketSocketBase):
         room = self._PARENT_SERVER._rooms.get(room_name)
         if room is None:
             room = WebSocketRoom(name=room_name)
-            self._PARENT_SERVER.rooms[room_name] = room
-        self.rooms_joined.add(room)
+            self._PARENT_SERVER._rooms[room_name] = room
+            print(self._PARENT_SERVER._rooms)
+        self._rooms_joined.add(room)
         room.add_member(self)
+
+    def leave_room(self, room):
+        if room in self._rooms_joined:
+            self._rooms_joined.remove(room)
+            room.remove_member(self)
 
     def to(
         self, room_name: str
     ) -> Type["RoomEmitter"]:  # Type is used here to avoid undefined errors.
-        if room_name not in self._joined_rooms:  # If the room does not exist.
+        if (
+            self._PARENT_SERVER._rooms[room_name] not in self._rooms_joined
+        ):  # If the room does not exist.
             logger.warning(
                 f"Room with id: {room_name}, does not exist."
             )  # Log the error.
 
         room_users: list = (
-            self._rooms[room_name] if room_name in self._rooms else []
+            self._PARENT_SERVER._rooms[room_name].members
+            if room_name in self._PARENT_SERVER._rooms
+            else []
         )  # Set list of sockets to list room_users.
 
-        return RoomEmitter(server_socket=self, room_users=room_users)
+        return RoomEmitter(sprocket_socket=self, room_users=room_users)
 
 
 class RoomEmitter:
