@@ -26,7 +26,6 @@ from typing import (
     Type,
 )  # Used for type annotations and decloration.
 from loguru import logger
-from ..sockets import ServerSocket
 from .sprocketsocketbase import SprocketSocketBase
 from ..frame_models import FrameOpcodes  # Import used classes.
 from ..rooms import *
@@ -38,15 +37,15 @@ class SprocketSocket(SprocketSocketBase):
     def __init__(
         self,
         SOCKET: socket,
-        PARENT_SERVER: ServerSocket,
+        PARENT_SERVER,
         MAX_FRAME_SIZE: Optional[int] = 125,
-        BACKLOG: Optional[int] = 5,
+        BUFFER_SIZE: Optional[int] = 8192,
     ) -> None:
         super().__init__(
             SOCKET=SOCKET,
             PARENT_SERVER=PARENT_SERVER,
             MAX_FRAME_SIZE=MAX_FRAME_SIZE,
-            BACKLOG=BACKLOG,
+            BUFFER_SIZE=BUFFER_SIZE,
         )
 
     def start_listening_thread(self) -> None:
@@ -139,11 +138,11 @@ class RoomEmitter:
         Initialiser method.
 
         Args:
-            server_socket ServerSocketImpl: The current instance of the server.
+            sprocket_socket SprocketSocket: The current instance of the socket.
             room list: The list of sockets in the specified room.
         """
         self.sprocket_socket: SprocketSocket = (
-            sprocket_socket  # Initialise instance of the server.
+            sprocket_socket  # Initialise instance of the socket.
         )
         self._room_users: List[
             SprocketSocket
@@ -152,7 +151,7 @@ class RoomEmitter:
     def emit(self, event: str, payload: (str | bytes | dict | None)) -> None:
         """
         Method used for emitting message to specific room, with use of the private emit method,
-        with respect to the current instance of the ServerSocketImpl instance.
+        with respect to the current instance of the Socket instance.
 
         Args:
             event str: The event to be trigger by the sent message.
