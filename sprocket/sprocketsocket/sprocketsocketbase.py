@@ -27,7 +27,6 @@ from typing import (
     Optional,
 )  # Used for type annotations and decloration.
 from loguru import logger  # Used for console logging.
-from ..sockets import ServerSocket  # Import ServerSocket class
 from ..frame_models import (
     WebSocketFrameEncoder,
     WebSocketFrameDecoder,
@@ -43,9 +42,9 @@ class SprocketSocketBase:
     def __init__(
         self,
         SOCKET: socket,
-        PARENT_SERVER: ServerSocket,
+        PARENT_SERVER,
         MAX_FRAME_SIZE: Optional[int] = 125,
-        BACKLOG: Optional[int] = 5,
+        BUFFER_SIZE: Optional[int] = 8192,
     ) -> None:
         if MAX_FRAME_SIZE is not None and not check_frame_size(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE  # Checks whether provided value is valid.
@@ -53,14 +52,15 @@ class SprocketSocketBase:
             raise FrameSizeException  # If value provided is not valid raise ValueError.
 
         self.SOCKET: socket = SOCKET
-        self._PARENT_SERVER: ServerSocket = PARENT_SERVER
-        self._BACKLOG: int = BACKLOG  # Set sockets backlog.
+        self._PARENT_SERVER = PARENT_SERVER
+        self._BUFFER_SIZE: int = BUFFER_SIZE  # Set sockets backlog.
         self._LOCK = threading.Lock()  # Protect access to shared resources.
         # ---------------------- #
         self._event_handlers: Dict[
             str, List[Callable]
         ] = {}  # Initialise _event_handlers.
         self._joined_rooms: set = set()
+        self._status = True
         self._frame_decoder: WebSocketFrameDecoder = WebSocketFrameDecoder(
             status=False
         )  # Initialise _frame_decoder.
@@ -120,7 +120,7 @@ class SprocketSocketBase:
         if (
             opcode == FrameOpcodes.ping
         ):  # Check if recieved frame opcode is a ping opcode.
-            logger.debug(f"Received Ping from Server.")
+            logger.debug(f"Received Ping from Client")
             self._pong()  # Send a pong frame in response.
             return
         if (
@@ -128,7 +128,7 @@ class SprocketSocketBase:
         ):  # Check if recieved frame opcode is a pong opcode.
             self._status = True
 
-            logger.success(f"Received Pong from Server.")
+            logger.success(f"Received Pong from Client")
             return
 
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
@@ -250,7 +250,10 @@ class SprocketSocketBase:
         try:
             while self in self._PARENT_SERVER._http_sockets:
                 readable_socket, writeable_socket, error_socket = select.select(
-                    [self.SOCKET], [self.SOCKET], [self.SOCKET], self._TIMEOUT
+                    [self.SOCKET],
+                    [self.SOCKET],
+                    [self.SOCKET],
+                    self._PARENT_SERVER._TIMEOUT,
                 )
 
                 if self.SOCKET.fileno() == -1:
@@ -273,7 +276,8 @@ class SprocketSocketBase:
                         socket=self
                     )  # Handle normal HTTP request.
 
-        except:  # If a Connection error occurs.
+        except Exception as e:  # If a Connection error occurs.
+            print(e)
             critical = True  # Set cirital to True.
 
         if not critical:  # If no error has occured.
