@@ -214,14 +214,14 @@ class ServerSocket(ABC):
             socket socket: The client socket with the WebSocket messages.
         """
 
-    @abstractmethod
-    def _create_new_client_thread(self, client_socket: socket) -> None:
-        """
-        Creats a new thread to handle communications with a specific client.
+    # @abstractmethod
+    # def _create_new_client_thread(self, client_socket: socket) -> None:
+    #     """
+    #     Creats a new thread to handle communications with a specific client.
 
-        Args:
-            client_socket socket: The client socket to be handled.
-        """
+    #     Args:
+    #         client_socket socket: The client socket to be handled.
+    #     """
 
     @abstractmethod
     def _handle_connection(self) -> None:
@@ -284,25 +284,25 @@ class ServerSocket(ABC):
             payload (str | bytes | dict | None): The payload to be sent with the event.
         """
 
-    @abstractmethod
-    def broadcast_message(
-        self, event: Optional[str] = "", payload: (str | bytes | dict | None) = ""
-    ) -> None:
-        """
-        Broadcasts a message to all WebSocket clients currently connected to the server.
+    # @abstractmethod
+    # def broadcast_message(
+    #     self, event: Optional[str] = "", payload: (str | bytes | dict | None) = ""
+    # ) -> None:
+    #     """
+    #     Broadcasts a message to all WebSocket clients currently connected to the server.
 
-        Args:
-            payload Optional[str]: The message to broadcast to clients.
-        """
+    #     Args:
+    #         payload Optional[str]: The message to broadcast to clients.
+    #     """
 
-    @abstractmethod
-    def ping(self, socket: socket) -> None:
-        """
-        Sends a WebSocket Ping frame to a specific client, prompting a Pong response.
+    # @abstractmethod
+    # def ping(self, socket: socket) -> None:
+    #     """
+    #     Sends a WebSocket Ping frame to a specific client, prompting a Pong response.
 
-        Args:
-            socket socket: The client socket to send the Ping frame to.
-        """
+    #     Args:
+    #         socket socket: The client socket to send the Ping frame to.
+    #     """
 
     @abstractmethod
     def on(self, event: str, handler: Callable) -> None:
