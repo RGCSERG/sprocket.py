@@ -128,7 +128,7 @@ class SprocketSocketBase:
         ):  # Check if recieved frame opcode is a pong opcode.
             self._status = True
 
-            logger.success(f"Received Pong from Client")
+            logger.success(f"Received Pong from Client {self.SOCKET.fileno()}")
             return
 
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
