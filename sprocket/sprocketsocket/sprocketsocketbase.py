@@ -59,7 +59,7 @@ class SprocketSocketBase:
         self._event_handlers: Dict[
             str, List[Callable]
         ] = {}  # Initialise _event_handlers.
-        self._joined_rooms: set = set()
+        self._rooms_joined: set = set()
         self._status = True
         self._frame_decoder: WebSocketFrameDecoder = WebSocketFrameDecoder(
             status=False
