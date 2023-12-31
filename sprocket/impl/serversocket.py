@@ -87,9 +87,9 @@ class ServerSocket(ServerSocketBaseImpl):
             self._rooms
         ):  # If no room_name provided, iterate through every individual room.
             if (
-                socket in self._rooms[room_name]
+                socket in self._rooms[room_name].members
             ):  # If the socket is in the current room.
-                self._rooms[room_name].remove(
+                self._rooms[room_name].remove_member(
                     socket
                 )  # Remove the socket from the room.
             if self._rooms[room_name] == []:  # If the room is empty.
