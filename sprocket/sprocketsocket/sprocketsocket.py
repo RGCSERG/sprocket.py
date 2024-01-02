@@ -109,7 +109,6 @@ class SprocketSocket(SprocketSocketBase):
         if room is None:
             room = WebSocketRoom(name=room_name)
             self._PARENT_SERVER._rooms[room_name] = room
-            print(self._PARENT_SERVER._rooms)
         self._rooms_joined.add(room)
         room.add_member(self)
 
