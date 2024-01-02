@@ -194,10 +194,10 @@ class HTTPRequestHandler:
             response_headers + response_body
         )  # Create full CORS violation response.
 
-        if not self.cors_middleware_enabled:
+        if not self._cors_middleware_enabled:
             # If cors not enabled.
 
-            if origin != self.HOST_DOMAIN:  # Check origin against host domain.
+            if "127.0.0.1" not in origin:  # Check origin against host domain.
                 # Handle CORS violation.
                 return full_response, False
 
