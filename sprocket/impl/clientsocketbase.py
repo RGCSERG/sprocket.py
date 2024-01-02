@@ -239,12 +239,16 @@ class ClientSocketBaseImpl(ClientSocket):
 
         logger.debug("Performing WebSocket Handshake")
 
+        origin = self._client_socket.getpeername()
+        origin = f"http://{str(origin[0])}:{str(origin[1])}"
+
         handshake_request: bytes = (
             f"GET {self._WS_ENDPOINT} HTTP/1.1\r\n"
             f"Host: {self._HOST}:{self._PORT}\r\n"
             "Upgrade: websocket\r\n"
             "Connection: Upgrade\r\n"
             f"Sec-WebSocket-Key: {self._WEBSOCKET_KEY}\r\n"
+            f"Origin: {origin}\r\n"
             f"Sec-WebSocket-Version: 13\r\n"
             "\r\n"
         ).encode(
