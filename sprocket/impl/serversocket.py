@@ -142,6 +142,31 @@ class ServerSocket(ServerSocketBaseImpl):
             socket=socket, opcode=FrameOpcodes.ping
         )  # Send a ping frame to the client socket.
 
+    def enable_cors_middleware(
+        self,
+        allow_origins: Optional[List[str]],
+        allow_credentials: Optional[bool],
+        allow_methods: Optional[List[str]],
+        allow_headers: Optional[List[str]],
+    ) -> None:
+        """
+        Enables CORS middleware on HTTPRequestHandler instance with specified settings.
+
+        Args:
+            allow_origins list: List of allowed origins.
+            allow_credentials bool: Allow credentials flag.
+            allow_methods list: List of allowed methods.
+            allow_headers list: List of allowed headers.
+        """
+        self._request_handler.enable_cors_middleware(
+            allow_origins=allow_origins,
+            allow_credentials=allow_credentials,
+            allow_methods=allow_methods,
+            allow_headers=allow_headers,
+        )
+
+        return
+
     def on(self, event: str, handler: Callable) -> None:
         if event not in self._event_handlers:  # If event not found.
             self._event_handlers[
