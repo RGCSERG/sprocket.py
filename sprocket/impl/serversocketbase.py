@@ -323,7 +323,7 @@ class ServerSocketBaseImpl(ServerSocket):
         )  # Using instance of _request_handler get the response and status of the request.
 
         if not status:  # If not a WebSocket Handshake.
-            socket.send(
+            socket.SOCKET.send(
                 response.encode("utf-8")
             ) if response else None  # Send decoded response.
             self._close_socket(socket=socket)  # Close the socket (HTTP).
