@@ -21,6 +21,7 @@ from typing import Callable, Final, List, Optional, Type
 from loguru import logger
 from .serversocketbase import *
 from ..frame_models import FrameOpcodes
+from ..rooms.websocketroom import *
 
 __all__: Final[List[str]] = ["ServerSocket"]
 
@@ -86,9 +87,9 @@ class ServerSocket(ServerSocketBaseImpl):
             self._rooms
         ):  # If no room_name provided, iterate through every individual room.
             if (
-                socket in self._rooms[room_name]
+                socket in self._rooms[room_name].members
             ):  # If the socket is in the current room.
-                self._rooms[room_name].remove(
+                self._rooms[room_name].remove_member(
                     socket
                 )  # Remove the socket from the room.
             if self._rooms[room_name] == []:  # If the room is empty.
@@ -100,32 +101,17 @@ class ServerSocket(ServerSocketBaseImpl):
         for room in rooms_to_remove:
             self._rooms.pop(room)
 
+        return
+
     def stop(self):
         for socket in self._active_sockets:  # For each active socket.
             self._close_socket(socket=socket)  # Send a control close connection frame.
         self.main_thread = False  # Terminate the server listening thread.
         self._server_socket.close()
 
-    def join_room(self, room_name: str, socket: socket) -> None:
-        if room_name not in self._rooms:  # If the room name does not exist.
-            self._rooms[room_name] = []  # Create the room with the provided name.
-        self._rooms[room_name].append(socket)  # Append the client socket to the room.
+        return
 
     def emit(
-        self, event: str, socket: socket, payload: (str | bytes | dict | None) = ""
-    ) -> None:
-        json_data: dict = {event: payload}  # Set up the json_data.
-
-        payload: str = json.dumps(json_data)  # Dump the json_data into str format.
-
-        frames = self._frame_encoder.encode_payload_to_frames(
-            payload=payload
-        )  # Encode the payload into WebSocket frames.
-
-        for frame in frames:  # For each frame created.
-            socket.send(frame)  # Send it to the given socket.
-
-    def broadcast_message(
         self, event: Optional[str] = "", payload: (str | bytes | dict | None) = ""
     ) -> None:
         for socket in self._websocket_sockets:  # For each active socket.
@@ -137,10 +123,7 @@ class ServerSocket(ServerSocketBaseImpl):
                 # Handle any errors or disconnections here
                 logger.warning(f"Error broadcasting message to client: {e}")
 
-    def ping(self, socket: socket) -> None:
-        self._send_websocket_message(
-            socket=socket, opcode=FrameOpcodes.ping
-        )  # Send a ping frame to the client socket.
+        return
 
     def enable_cors_middleware(
         self,
@@ -172,9 +155,23 @@ class ServerSocket(ServerSocketBaseImpl):
             self._event_handlers[
                 event
             ] = []  # Append it to the _event_handlers dictionary.
-        self._event_handlers[event] = [
+        self._event_handlers[event].append(
             handler
-        ]  # Then append the provided handler to the dictionary entry.
+        )  # Then append the provided handler to the dictionary entry.
+
+        return
+
+    def join_room(self, room_name: str) -> None:
+        for socket in self._websocket_sockets:
+            if room_name not in self._rooms:  # If the room name does not exist.
+                self._rooms[room_name] = WebSocketRoom(
+                    name=room_name
+                )  # Create the room with the provided name.
+            self._rooms[room_name].add_member(
+                socket
+            )  # Append the client socket to the room.
+
+        return
 
     def to(
         self, room_name: str

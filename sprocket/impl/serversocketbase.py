@@ -44,6 +44,8 @@ from ..exceptions import (
     WSEndpointException,
 )  # Import used exceptions.
 from .requesthandler import *  # Import RequestHandler.
+from ..sprocketsocket.sprocketsocket import *
+from ..rooms.websocketroom import *
 
 
 __all__: Final[List[str]] = ["ServerSocketBaseImpl"]
@@ -77,6 +79,8 @@ class ServerSocketBaseImpl(ServerSocket):
         ):  # Checks if MAX_FRAME_SIZE is not None, if not then checks whether the provided value is valid.
             raise FrameSizeException  # If value provided is not valid raise ValueError.
 
+        self._MAX_FRAME_SIZE = MAX_FRAME_SIZE
+
         # Value not set in this class.
 
         if WS_ENDPOINT is not None and not check_endpoint(
@@ -94,12 +98,14 @@ class ServerSocketBaseImpl(ServerSocket):
         self._WEBSOCKET_GUID: str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"  # Sets the GUID to the GUID defined in RFC6455
         self._LOCK = threading.Lock()  # Protect access to shared resources.
         # ---------------------- #
-        self._rooms: Dict[str, list] = {}  # Initialise _rooms.
+        self._rooms: Dict[str, WebSocketRoom] = {}  # Initialise _rooms.
         self._event_handlers: Dict[
             str, List[Callable]
         ] = {}  # Initialise _event_handlers.
-        self._http_sockets: list = []  # Initialise _http_sockets.
-        self._websocket_sockets: list = []  # Initialise websocket sockets.
+        self._http_sockets: List[SprocketSocket] = []  # Initialise _http_sockets.
+        self._websocket_sockets: List[
+            SprocketSocket
+        ] = []  # Initialise websocket sockets.
         self._request_handler: HTTPRequestHandler = HTTPRequestHandler(
             WS_ENDPOINT=WS_ENDPOINT, HOST=HOST, PORT=PORT
         )  # Initialise _request_handler.
@@ -114,7 +120,7 @@ class ServerSocketBaseImpl(ServerSocket):
 
     # Private methods.
 
-    def _remove_socket_from_lists(self, socket: socket) -> None:
+    def _remove_socket_from_lists(self, socket: SprocketSocket) -> None:
         if (
             socket in self._websocket_sockets
         ):  # If the given socket is in _websocket_sockets.
@@ -128,30 +134,45 @@ class ServerSocketBaseImpl(ServerSocket):
 
     def _send_websocket_message(
         self,
-        socket: socket,
         payload: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
     ) -> None:
-        logger.debug("Sending Message")
+        logger.debug("Sending WebSocket message to all connected sockets.")
+        for socket in self._websocket_sockets:
+            frames = self._frame_encoder.encode_payload_to_frames(
+                payload=payload, opcode=opcode
+            )  # Encoded the given payload and opcode to WebSocket frame(s).
+
+            for frame in frames:  # For each frame created.
+                socket.SOCKET.send(frame)  # Send the frame to the provided socket.
+
+                return
+
+    def _emit(
+        self, event: str, socket: socket, payload: (str | bytes | dict | None) = ""
+    ) -> None:
+        json_data: dict = {event: payload}  # Set up the json_data.
+
+        payload: str = json.dumps(json_data)  # Dump the json_data into str format.
 
         frames = self._frame_encoder.encode_payload_to_frames(
-            payload=payload, opcode=opcode
-        )  # Encoded the given payload and opcode to WebSocket frame(s).
+            payload=payload
+        )  # Encode the payload into WebSocket frames.
 
         for frame in frames:  # For each frame created.
-            socket.send(frame)  # Send the frame to the provided socket.
+            socket.send(frame)  # Send it to the given socket.
 
-            return
-
-    def _close_socket(self, socket: socket, critical: Optional[bool] = False) -> None:
+    def _close_socket(
+        self, socket: SprocketSocket, critical: Optional[bool] = False
+    ) -> None:
         with self._LOCK:  # Protect access to shared resources.
             logger.warning("closing socket")
 
             if (
                 socket in self._websocket_sockets and not critical
             ):  # If the socket is a WebSocket.
-                self._send_websocket_message(
-                    socket=socket, opcode=FrameOpcodes.close
+                socket._send_websocket_message(
+                    opcode=FrameOpcodes.close
                 )  # Send a close frame.
 
             self._remove_socket_from_lists(
@@ -235,7 +256,7 @@ class ServerSocketBaseImpl(ServerSocket):
 
         return
 
-    def _handle_handshake(self, socket: socket, headers: dict) -> None:
+    def _handle_handshake(self, socket: SprocketSocket, headers: dict) -> None:
         sec_websocket_key = headers.get(
             "sec-websocket-key"
         )  # Retrieve the sec-websocket-key header.
@@ -254,21 +275,23 @@ class ServerSocketBaseImpl(ServerSocket):
             "utf-8"
         )  # Create valid response message.
 
-        socket.send(response)  # Send the response back to the client.
+        socket.SOCKET.send(response)  # Send the response back to the client.
 
         self._websocket_sockets.append(
             socket
         )  # Add the socket to the _websocket_sockets list.
 
+        socket.start_heartbeat()
+
         self._trigger(event="connection", socket=socket)  # Trigger connection event.
 
         return
 
-    def _receive_http_request(self, socket: socket) -> str:
+    def _receive_http_request(self, socket: SprocketSocket) -> str:
         request_data: bytes = b""  # Initialise request data.
 
         while True:
-            http_chunk = socket.recv(self._BUFFER_SIZE)  # Read socket data.
+            http_chunk = socket.SOCKET.recv(self._BUFFER_SIZE)  # Read socket data.
 
             if not http_chunk:
                 break  # Break the loop when no more data is received.
@@ -284,7 +307,7 @@ class ServerSocketBaseImpl(ServerSocket):
 
         return decoded_request_data
 
-    def _handle_request(self, socket: socket) -> None:
+    def _handle_request(self, socket: SprocketSocket) -> None:
         logger.debug("Handling HTTP request")
 
         request_data: str = self._receive_http_request(
@@ -312,14 +335,12 @@ class ServerSocketBaseImpl(ServerSocket):
 
         return
 
-    def _pong(self, socket: socket) -> None:
-        self._send_websocket_message(
-            socket=socket, opcode=FrameOpcodes.pong
-        )  # Send pong frame.
+    def _pong(self, socket: SprocketSocket) -> None:
+        socket._send_websocket_message(opcode=FrameOpcodes.pong)  # Send pong frame.
 
         return
 
-    def _check_control_frame(self, opcode: bytes, socket: socket) -> None:
+    def _check_control_frame(self, opcode: bytes, socket: SprocketSocket) -> None:
         if opcode == FrameOpcodes.close:  # If the opcode is a close connection.
             self._close_socket(socket=socket)  # Close the socket.
 
@@ -345,13 +366,13 @@ class ServerSocketBaseImpl(ServerSocket):
         # Check the FIN bit in the first byte of the frame.
         return (frame_in_bytes[0] & 0x80) >> 7 == 1
 
-    def _handle_message(self, socket: socket) -> None:
+    def _handle_message(self, socket: SprocketSocket) -> None:
         frame_in_bytes: bytes = b""  # Initialise frame_in_bytes.
         final_message: str = ""  # Initialise final_message.
         fragmented: bool = False  # Initialise fragmented.
 
         while True:
-            frame_data = socket.recv(self._BUFFER_SIZE)  # Read socket data.
+            frame_data = socket.SOCKET.recv(self._BUFFER_SIZE)  # Read socket data.
 
             if frame_data == b"":
                 # Connection closed, or no data received.
@@ -419,70 +440,28 @@ class ServerSocketBaseImpl(ServerSocket):
                 final_message=message_dict if message_dict else final_message
             )  # Trigger the event given.
 
-    def _create_new_client_thread(self, client_socket: socket) -> None:
-        critical = False  # Initialise critical.
-
-        try:
-            while client_socket in self._http_sockets:
-                readable_socket, writeable_socket, error_socket = select.select(
-                    [client_socket], [client_socket], [client_socket], self._TIMEOUT
-                )
-
-                if client_socket.fileno() == -1:
-                    # No data to be read, so carry on to the next cycle.
-                    continue
-
-                if client_socket in error_socket:
-                    critical = True
-                    break
-
-                if (
-                    client_socket in self._websocket_sockets and readable_socket
-                ):  # If the socket has opened a WebSocket connection.
-                    self._handle_message(
-                        socket=client_socket
-                    )  # Handle the Websocket message.
-                    continue
-
-                if client_socket in readable_socket:
-                    self._handle_request(
-                        socket=client_socket
-                    )  # Handle normal HTTP request.
-
-        except:  # If a Connection error occurs.
-            critical = True  # Set cirital to True.
-
-        if not critical:  # If no error has occured.
-            logger.warning(f"Closed socket: {client_socket}")
-
-            return
-
-        # If an error has occcured close the socket, to stop more errors occuring.
-        self._close_socket(socket=client_socket, critical=critical)
-
-        logger.critical(f"Socket Forcibly closed {client_socket}")
-
-        return
-
     def _handle_connection(self) -> None:
         (
             new_socket,
             socket_address,
         ) = self._server_socket.accept()  # Accept the connection.
 
+        new_socket = SprocketSocket(
+            SOCKET=new_socket,
+            PARENT_SERVER=self,
+            MAX_FRAME_SIZE=self._MAX_FRAME_SIZE,
+            BUFFER_SIZE=self._BUFFER_SIZE,
+        )
+
         self._http_sockets.append(
             new_socket
         )  # Append the socket to the active sockets list.
 
         logger.success(
-            f"New Connection connection: {new_socket.fileno()} from address: {socket_address}"
+            f"New Connection connection: {new_socket.SOCKET.fileno()} from address: {socket_address}"
         )
 
-        client_listening_thread = threading.Thread(
-            target=self._create_new_client_thread, args=[new_socket]
-        )  # Create a new client listening thread.
-
-        client_listening_thread.start()  # Start the client listening thread.
+        new_socket.start_listening_thread()
 
         return
 
