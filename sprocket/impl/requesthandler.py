@@ -23,6 +23,7 @@ from typing import (
     Final,
     List,
     Literal,
+    Optional,
 )  # Used for type annotations and decloration.
 
 
@@ -51,6 +52,16 @@ class HTTPRequestHandler:
         self.headers: dict = {}  # Initialise headers.
         self.http_version: str = ""  # Initialise http_version.
 
+        self._cors_middleware_enabled: bool = (
+            False  # Initialise cors_middleware_enabled bool.
+        )
+        self._cors_allow_origins: List[str] = [
+            f"http://{HOST}:{PORT}"
+        ]  # Initialise allowed origins
+        self._cors_allow_credentials: bool = True  # Initialise _cors_allow_credentials.
+        self._cors_allow_methods: List[str] = ["*"]
+        self._cors_allow_headers: List[str] = ["*"]
+
     @staticmethod
     def _parse_request_line(first_line: str) -> tuple[str, str, str]:
         """
@@ -78,6 +89,9 @@ class HTTPRequestHandler:
 
         Args:
             headers list[str]: All trailing lines after index 0.
+
+        Returns:
+            headers dict: The parsed headers.
         """
 
         # For each line in the headers list set the stored header and value to a key and value in the headers dictionary.
@@ -112,9 +126,31 @@ class HTTPRequestHandler:
 
         return True
 
-    def _validate_handshake(
-        self, method: str, target: str, headers: dict, http_version: str
-    ) -> bool:
+    def _validate_headers(self, headers: dict) -> bool:
+        """
+        Validates the headers.
+
+        Args:
+            headers (dict): The headers of the given requests in dictionary form.
+
+        Returns:
+            headers_valid bool: True if headers are valid; False otherwise.
+        """
+
+        headers_valid: bool = (  # Returned value should be bool.
+            headers.get("upgrade", "")
+            == "websocket"  # Check for upgrade header, and validate its value.
+            and headers.get("connection", "")
+            == "Upgrade"  # Check for connection header, and validate its value.
+            and headers.get("host", "")
+            == self.HOST_DOMAIN  # Host is the same as server address.
+            and "sec-websocket-key"
+            in headers  # Check there is a valid sec-websocket-key value.
+        )
+
+        return headers_valid
+
+    def _validate_handshake(self, headers: dict, http_version: str) -> bool:
         """
         Determines whether or not any given request is a valid (True) WebSocket handshake,
         for a given server.
@@ -143,17 +179,71 @@ class HTTPRequestHandler:
         if http_version < 1.1:  # Check if version is valid.
             return False  # If invalid return an invalid request (False).
 
-        # Validate headers.
-        headers_valid: bool = (  # Returned value should be bool.
-            headers.get("upgrade", "")
-            == "websocket"  # Check for upgrade header, and validate its value.
-            and headers.get("connection", "")
-            == "Upgrade"  # Check for connection header, and validate its value.
-            and headers.get("host", "") == self.HOST_DOMAIN  # CORS validation.
-            and "sec-websocket-key"
-            in headers  # Check there is a valid sec-websocket-key value.
-        )
+        headers_valid: bool = self._validate_headers(
+            headers=headers
+        )  # Validate headers.
         return headers_valid
+
+    def _cors_validation(self, method: str, headers: dict) -> bool:
+        response_body = "<html><body><h1>Origin, Method, or specific header not allowed</h1></body></html>"  # Set CORS violation response.
+        response_headers = f"HTTP/1.1 {HTTPStatus.FORBIDDEN}\r\nContent-Length: {len(response_body)}\r\n\r\n"  # Set CORS violation response.
+
+        origin = headers.get("origin", "")  # Retrieve origin.
+
+        full_response = (
+            response_headers + response_body
+        )  # Create full CORS violation response.
+
+        if not self.cors_middleware_enabled:
+            # If cors not enabled.
+
+            if origin != self.HOST_DOMAIN:  # Check origin against host domain.
+                # Handle CORS violation.
+                return full_response, False
+
+            # Return valid response.
+            return None, True
+
+        # If CORS enabled.
+
+        if self.cors_allow_credentials:  # Handle CORS credentials if allowed.
+            # Basic Cors credentials response.
+
+            response_headers += f"Access-Control-Allow-Origin: {', '.join(self._cors_allow_origins)}\r\n"  # Set Access-Control-Allow-Origin header.
+            response_headers += f"Access-Control-Allow-Methods: {', '.join(self._cors_allow_methods)}\r\n"  # Set Access-Control-Allow-Methods header.
+            response_headers += f"Access-Control-Allow-Headers: {', '.join(self._cors_allow_headers)}\r\n"  # Set Access-Control-Allow-Headers header.
+
+        if (
+            origin
+            not in self._cors_allow_origins  # Check origin against allowed origins.
+            and "*" not in self._cors_allow_origins  # Check that * wildcard not played.
+        ):
+            # Handle CORS violation.
+            return full_response, False
+
+        if (
+            method
+            not in self._cors_allow_methods  # Check method against allowed methods.
+            and "*" not in self._cors_allow_methods  # Check that * wildcard not played.
+        ):
+            # Handle CORS violation.
+            return full_response, False
+
+        if "*" in self._cors_allow_headers:  # If * wildcard played.
+            # Save proccessing power and allow all.
+            pass
+
+        else:
+            headers_valid: bool = set(headers.keys()).issubset(
+                self._cors_allow_headers
+            )  # Check all headers are within cors policy.
+
+            if not headers_valid:  # If invalid.
+                # Handle CORS violation.
+                return full_response, False
+
+        # Return valid response.
+        return None, True
 
     def _parse_request(self, request_data: str) -> tuple[str, str, dict, str] | None:
         """
@@ -182,6 +272,42 @@ class HTTPRequestHandler:
 
         return method, target, headers, http_version
 
+    def enable_cors_middleware(
+        self,
+        allow_origins: Optional[List[str]],
+        allow_credentials: Optional[bool],
+        allow_methods: Optional[List[str]],
+        allow_headers: Optional[List[str]],
+    ) -> None:
+        """
+        Enables CORS middleware with specified settings.
+
+        Args:
+            allow_origins list: List of allowed origins.
+            allow_credentials bool: Allow credentials flag.
+            allow_methods list: List of allowed methods.
+            allow_headers list: List of allowed headers.
+        """
+        self._cors_allow_origins = (
+            allow_origins if allow_origins != None else self._cors_allow_origins
+        )  # Set _cors_allow_origins.
+
+        self._cors_allow_methods = (
+            allow_methods if allow_methods != None else self._cors_allow_methods
+        )  # Set _cors_allow_methods.
+
+        self._cors_allow_headers = (
+            allow_headers if allow_headers != None else self._cors_allow_headers
+        )  # Set _cors_allow_headers.
+
+        self._cors_allow_credentials = allow_credentials  # Set _cors_allow_credentials.
+
+        self._cors_middleware_enabled = True  # Enable Cors middleware.
+
+        logger.info("CORS middleware enabled with specified settings")
+
+        return
+
     def process_request(
         self, request_data: str
     ) -> tuple[str, Literal[False]] | tuple[dict | Any, Literal[True]]:
@@ -208,7 +334,7 @@ class HTTPRequestHandler:
         self.request_data = request_data  # Set full request data to class attribute.
 
         request: tuple = self._parse_request(
-            request_data=self.request_data
+            request_data=request_data
         )  # Parse the request.
 
         (
@@ -218,11 +344,18 @@ class HTTPRequestHandler:
             http_version,
         ) = request  # Retrieve each individual attribute.
 
-        # Set each value to class attribute.
+        # Set each value to class attribute for use at higher levels.
         self.method = method
         self.target = target
         self.headers = headers
         self.http_version = http_version
+
+        cors_validation = self._cors_validation(
+            method=method, headers=headers
+        )  # Validate Cors policy.
+
+        if not cors_validation[1]:  # Check if valid.
+            return cors_validation  # If not return the invalid response.
 
         if not request or not self._check_if_ws_request(
             method=method, target=target
@@ -230,7 +363,7 @@ class HTTPRequestHandler:
             return full_response, False  # If not return bad request response and False.
 
         if not self._validate_handshake(
-            method=method, target=target, headers=headers, http_version=http_version
+            headers=headers, http_version=http_version
         ):  # Validate the handshake request.
             logger.success("Handshake invalid")
             return full_response, False  # If not return bad request response and False.
