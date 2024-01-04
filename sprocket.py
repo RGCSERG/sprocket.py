@@ -4,6 +4,13 @@ from loguru import logger
 
 io = ServerSocket()
 
+io.enable_cors_middleware(
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_headers=["*"],
+    allow_methods=["*"],
+)
+
 
 def main(socket):
     def on_join(room_name: str):
