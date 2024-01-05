@@ -43,8 +43,8 @@ class SprocketSocketBase:
         self,
         SOCKET: socket,
         PARENT_SERVER,
-        MAX_FRAME_SIZE: Optional[int] = 125,
         BUFFER_SIZE: Optional[int] = 8192,
+        MAX_FRAME_SIZE: Optional[int] = 125,
     ) -> None:
         if MAX_FRAME_SIZE is not None and not check_frame_size(
             MAX_FRAME_SIZE=MAX_FRAME_SIZE  # Checks whether provided value is valid.
@@ -60,7 +60,7 @@ class SprocketSocketBase:
             str, List[Callable]
         ] = {}  # Initialise _event_handlers.
         self._rooms_joined: set = set()
-        self._status = True
+        self._status: bool = True
         self._frame_decoder: WebSocketFrameDecoder = WebSocketFrameDecoder(
             status=False
         )  # Initialise _frame_decoder.
@@ -76,8 +76,6 @@ class SprocketSocketBase:
         payload: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
     ) -> None:
-        logger.debug("Sending Message")
-
         frames = self._frame_encoder.encode_payload_to_frames(
             payload=payload, opcode=opcode
         )  # Encoded the given payload and opcode to WebSocket frame(s).
@@ -94,7 +92,8 @@ class SprocketSocketBase:
             return
 
         if self in self._PARENT_SERVER._websocket_sockets:  # if the socket is open.
-            logger.debug("Activating Ping")
+            # if self._debug:
+            #     logger.info(f"Activating Ping to client {self.SOCKET.fileno()}")
 
             self._status = False
 
@@ -120,7 +119,8 @@ class SprocketSocketBase:
         if (
             opcode == FrameOpcodes.ping
         ):  # Check if recieved frame opcode is a ping opcode.
-            logger.debug(f"Received Ping from Client")
+            # if self._debug:
+            #     logger.info(f"Received Ping from Client {self.SOCKET.fileno()}")
             self._pong()  # Send a pong frame in response.
             return
         if (
@@ -128,7 +128,8 @@ class SprocketSocketBase:
         ):  # Check if recieved frame opcode is a pong opcode.
             self._status = True
 
-            logger.success(f"Received Pong from Client {self.SOCKET.fileno()}")
+            # if self._debug:
+            #     logger.success(f"Received Pong from Client {self.SOCKET.fileno()}")
             return
 
     def _trigger(self, event: str, *args: tuple, **kwargs: dict[str, Any]) -> None:
@@ -144,7 +145,7 @@ class SprocketSocketBase:
     def _trigger_event_from_message(self, final_message: dict | str) -> None:
         if type(final_message) == str:
             logger.warning(
-                f"Message with no endpoint recieved: {final_message}"
+                f"Message with no endpoint recieved from Client {self.SOCKET.fileno()}: {final_message}"
             )  # Log the error, no execption is needed here.
             return
 
@@ -181,8 +182,6 @@ class SprocketSocketBase:
             if frame_data == b"":
                 # Connection closed, or no data received.
                 break
-
-            logger.debug("Handling websocket message")
 
             frame_in_bytes = frame_data  # set frame_in_bytes to frame_data.
 
@@ -277,7 +276,7 @@ class SprocketSocketBase:
                     )  # Handle normal HTTP request.
 
         except Exception as e:  # If a Connection error occurs.
-            print(e)
+            logger.warning(e)
             critical = True  # Set cirital to True.
 
         if not critical:  # If no error has occured.
