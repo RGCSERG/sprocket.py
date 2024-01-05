@@ -137,7 +137,6 @@ class ServerSocketBaseImpl(ServerSocket):
         payload: Optional[str] = "",
         opcode: Optional[bytes] = 0x1,
     ) -> None:
-        logger.debug("Sending WebSocket message to all connected sockets.")
         for socket in self._websocket_sockets:
             frames = self._frame_encoder.encode_payload_to_frames(
                 payload=payload, opcode=opcode
@@ -146,7 +145,7 @@ class ServerSocketBaseImpl(ServerSocket):
             for frame in frames:  # For each frame created.
                 socket.SOCKET.send(frame)  # Send the frame to the provided socket.
 
-                return
+        return
 
     def _emit(
         self, event: str, socket: socket, payload: (str | bytes | dict | None) = ""
@@ -166,8 +165,6 @@ class ServerSocketBaseImpl(ServerSocket):
         self, socket: SprocketSocket, critical: Optional[bool] = False
     ) -> None:
         with self._LOCK:  # Protect access to shared resources.
-            logger.warning("closing socket")
-
             if (
                 socket in self._websocket_sockets and not critical
             ):  # If the socket is a WebSocket.
@@ -308,8 +305,6 @@ class ServerSocketBaseImpl(ServerSocket):
         return decoded_request_data
 
     def _handle_request(self, socket: SprocketSocket) -> None:
-        logger.debug("Handling HTTP request")
-
         request_data: str = self._receive_http_request(
             socket=socket
         )  # Retrieve request_data.
@@ -319,7 +314,7 @@ class ServerSocketBaseImpl(ServerSocket):
             return  # Stop the rest of the code executing.
 
         response, status = self._request_handler.process_request(
-            request_data=request_data
+            request_data=request_data, fileno=socket.SOCKET.fileno()
         )  # Using instance of _request_handler get the response and status of the request.
 
         if not status:  # If not a WebSocket Handshake.
@@ -334,111 +329,6 @@ class ServerSocketBaseImpl(ServerSocket):
         )  # Handle the WebSocket handshake.
 
         return
-
-    def _pong(self, socket: SprocketSocket) -> None:
-        socket._send_websocket_message(opcode=FrameOpcodes.pong)  # Send pong frame.
-
-        return
-
-    def _check_control_frame(self, opcode: bytes, socket: SprocketSocket) -> None:
-        if opcode == FrameOpcodes.close:  # If the opcode is a close connection.
-            self._close_socket(socket=socket)  # Close the socket.
-
-            return
-
-        if opcode == FrameOpcodes.ping:  # If the opcode is a ping frame.
-            logger.debug(f"Recived Ping from {socket}")
-
-            self._pong(socket=socket)  # Send a pong in response.
-
-            self._trigger("ping")  # Trigger ping event.
-
-            return
-
-        if opcode == FrameOpcodes.pong:  # If the opcode is a pong frame.
-            logger.debug(f"Recived Pong from {socket}")
-
-            self._trigger("pong")  # Trigger pong event.
-
-            return
-
-    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
-        # Check the FIN bit in the first byte of the frame.
-        return (frame_in_bytes[0] & 0x80) >> 7 == 1
-
-    def _handle_message(self, socket: SprocketSocket) -> None:
-        frame_in_bytes: bytes = b""  # Initialise frame_in_bytes.
-        final_message: str = ""  # Initialise final_message.
-        fragmented: bool = False  # Initialise fragmented.
-
-        while True:
-            frame_data = socket.SOCKET.recv(self._BUFFER_SIZE)  # Read socket data.
-
-            if frame_data == b"":
-                # Connection closed, or no data received.
-                break
-
-            logger.debug("Handling websocket message")
-
-            frame_in_bytes = frame_data  # set frame_in_bytes to frame_data.
-
-            if not self._is_final_frame(frame_in_bytes):
-                # This is a fragmented frame
-                fragmented = True
-
-                self._frame_decoder.decode_websocket_message(
-                    frame_in_bytes=frame_in_bytes
-                )  # Decode the given frame.
-
-                message_payload = self._frame_decoder.payload_data.decode(
-                    "utf-8"
-                )  # Retrieve the decoded payload_data.
-
-                final_message += (
-                    message_payload  # Add the decoded message to the final message.
-                )
-                continue
-
-            # This is a non-fragmented frame
-            self._frame_decoder.decode_websocket_message(
-                frame_in_bytes=frame_in_bytes
-            )  # Decode the frame.
-
-            control_opcode = (
-                self._frame_decoder.opcode
-            )  # Retrieve the opcode (control frames can't be fragmented).
-
-            if check_if_control(opcode=control_opcode) and not fragmented:
-                self._check_control_frame(
-                    opcode=control_opcode, socket=socket
-                )  # Check which opcode is present.
-
-            message_payload = self._frame_decoder.payload_data.decode(
-                "utf-8"
-            )  # Retrieve the decoded payload_data.
-
-            final_message += (
-                message_payload  # Add the decoded message to the final message.
-            )
-            break  # Break the loop early so no more data is read for this message.
-
-        if (
-            final_message and frame_in_bytes
-        ):  # If both the final message and frame are present.
-            frame_in_bytes = b""  # Reset the frame_in_bytes.
-
-            message_dict: dict = {}
-
-            try:
-                message_dict: dict = json.loads(
-                    final_message
-                )  # Load the final message (if a dictionary).
-            except:
-                pass
-
-            self._trigger_event_from_message(
-                final_message=message_dict if message_dict else final_message
-            )  # Trigger the event given.
 
     def _handle_connection(self) -> None:
         (
@@ -461,7 +351,7 @@ class ServerSocketBaseImpl(ServerSocket):
             f"New Connection connection: {new_socket.SOCKET.fileno()} from address: {socket_address}"
         )
 
-        new_socket.start_listening_thread()
+        new_socket.start_listening_thread()  # Start the listening thread for the socket.
 
         return
 
@@ -478,5 +368,4 @@ class ServerSocketBaseImpl(ServerSocket):
                     # There is no data to be read.
                     continue
                 if socket == self._server_socket:  # If the socket is the server socket.
-                    logger.success("Handling New HTTP connection")
                     self._handle_connection()  # Handle the incomming HTTP connection.
