@@ -174,45 +174,45 @@ class ServerSocket(ABC):
             socket socket: The client socket sending the request.
         """
 
-    @abstractmethod
-    def _pong(self, socket: socket) -> None:
-        """
-        Sends a pong frame to a client socket.
+    # @abstractmethod
+    # def _pong(self, socket: socket) -> None:
+    #     """
+    #     Sends a pong frame to a client socket.
 
-        Args:
-            socket socket: The client socket for the pong frame to be sent to.
-        """
+    #     Args:
+    #         socket socket: The client socket for the pong frame to be sent to.
+    #     """
 
-    @abstractmethod
-    def _check_control_frame(self, opcode: bytes, socket: socket) -> None:
-        """
-        Inspects a WebSocket frame's opcode to identify control frames and handles them accordingly.
+    # @abstractmethod
+    # def _check_control_frame(self, opcode: bytes, socket: socket) -> None:
+    #     """
+    #     Inspects a WebSocket frame's opcode to identify control frames and handles them accordingly.
 
-        Args:
-            opcode bytes: The opcode of the WebSocket frame.
-            socket socket: The client socket that sent the frame.
-        """
+    #     Args:
+    #         opcode bytes: The opcode of the WebSocket frame.
+    #         socket socket: The client socket that sent the frame.
+    #     """
 
-    @abstractmethod
-    def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
-        """
-        Determines whether a WebSocket frame is the final frame of a message.
+    # @abstractmethod
+    # def _is_final_frame(self, frame_in_bytes: bytes) -> bool:
+    #     """
+    #     Determines whether a WebSocket frame is the final frame of a message.
 
-        Args:
-            frame_in_bytes bytes: The WebSocket frame data.
+    #     Args:
+    #         frame_in_bytes bytes: The WebSocket frame data.
 
-        Returns:
-            bool: True if it's the final frame, otherwise False.
-        """
+    #     Returns:
+    #         bool: True if it's the final frame, otherwise False.
+    #     """
 
-    @abstractmethod
-    def _handle_message(self, socket: socket) -> None:
-        """
-        Processes and handles incoming WebSocket messages received from a client socket.
+    # @abstractmethod
+    # def _handle_message(self, socket: socket) -> None:
+    #     """
+    #     Processes and handles incoming WebSocket messages received from a client socket.
 
-        Args:
-            socket socket: The client socket with the WebSocket messages.
-        """
+    #     Args:
+    #         socket socket: The client socket with the WebSocket messages.
+    #     """
 
     # @abstractmethod
     # def _create_new_client_thread(self, client_socket: socket) -> None:
