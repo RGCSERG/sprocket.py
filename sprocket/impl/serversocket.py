@@ -66,13 +66,13 @@ class ServerSocket(ServerSocketBaseImpl):
         )  # Initialise listening thread.
         listen_thread.start()  # Start listening thread.
 
-    def leave_room(self, socket: socket, room_name: Optional[str] = "") -> None:
-        rooms_to_remove = []  # Create a list to store rooms that need to be removed.
+    def leave_room(self, socket, room_name: Optional[str] = "") -> None:
+        rooms_to_remove = []  # List to store rooms that need to be removed.
 
         if (
             room_name in self._rooms and socket in self._rooms[room_name]
         ):  # If room name provided, and the socket in that room.
-            self._rooms[room_name].remove(
+            self._rooms[room_name].remove_member(
                 socket
             )  # Remove the socket from the provided room.
 
