@@ -48,6 +48,8 @@ class SprocketSocket(SprocketSocketBase):
             BUFFER_SIZE=BUFFER_SIZE,
         )
 
+        self.ID: str = str(self.SOCKET.fileno())
+
     def start_listening_thread(self) -> None:
         listen_thread = threading.Thread(
             target=self._listen_for_messages
@@ -67,7 +69,7 @@ class SprocketSocket(SprocketSocketBase):
         return
 
     def close(self) -> None:
-        logger.warning("Sending Close Frame")
+        logger.warning(f"Closing Socket: {self.SOCKET.fileno()}")
 
         if (
             self in self._PARENT_SERVER._websocket_sockets
